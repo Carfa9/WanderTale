@@ -1,0 +1,6 @@
+@WanderTale_HostAddress = http://localhost:5064
+
+GET {{WanderTale_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk">
+
+  <PropertyGroup>
+    <ProjectType>esproj</ProjectType>
+
+    <!-- Var frontend-koden ligger -->
+    <NodeProjectDirectory>WanderTale.Web</NodeProjectDirectory>
+    <StartCommand>npm run dev</StartCommand>
+    <BuildCommand>npm run build</BuildCommand>
+    <CleanCommand>npm run clean</CleanCommand>
+  </PropertyGroup>
+
+</Project>
