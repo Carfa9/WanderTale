@@ -1,4 +1,80 @@
-﻿.idea/
+﻿########################################
+#   GLOBAL IGNORE (ROOT)
+########################################
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+
+# OS-filer
+.DS_Store
+Thumbs.db
+desktop.ini
+
+########################################
+#   DOTNET BACKEND
+########################################
+
+# Byggmappar
+bin/
+obj/
+
+# User-specific
+*.user
+*.suo
+*.cache
+*.pdb
+
+# Logs
+*.log
+
+########################################
+#   ENTITY FRAMEWORK / SQLITE
+########################################
+
+# SQLite databaser
 *.db
 *.db-shm
 *.db-wal
+
+########################################
+#   REACT NATIVE / EXPO
+########################################
+
+# Node modules
+node_modules/
+
+# Metro / Expo cache
+.expo/
+.expo-shared/
+.expo-dev/
+
+# Build output
+dist/
+web-build/
+build/
+
+########################################
+#   ENV / SECRET FILES
+########################################
+
+.env
+.env.*  
+secrets.json
+
+########################################
+#   MISC
+########################################
+
+# Temporary files
+*.tmp
+*.temp
+
+# NPM / Yarn debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Maps
+*.map
