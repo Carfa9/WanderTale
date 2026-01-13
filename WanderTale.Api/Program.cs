@@ -5,6 +5,8 @@ using WanderTale.Models;         // där Trip ligger
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.UseUrls("http://localhost:5064");
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=wanderTale.db"));
 
@@ -18,7 +20,20 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
+
 var app = builder.Build();
+
+app.UseCors("AllowFrontend");
 
 app.UseSwagger();
 app.UseSwaggerUI(c =>
