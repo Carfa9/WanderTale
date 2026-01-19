@@ -8,10 +8,20 @@ import {useState} from "react";
 import {QueryClient} from "@tanstack/query-core";
 import {QueryClientProvider} from "@tanstack/react-query";
 import {Ionicons} from "@expo/vector-icons";
+import { useFonts } from "expo-font";
+import { IndieFlower_400Regular } from "@expo-google-fonts/indie-flower";
 
 export default function RootLayout() {
  
     const [queryClient] = useState(() => new QueryClient());
+
+    const [fontsLoaded] = useFonts({
+        IndieFlower: IndieFlower_400Regular,
+    });
+
+    if (!fontsLoaded) {
+        return null; 
+    }
 
   return (
       <SafeAreaProvider>

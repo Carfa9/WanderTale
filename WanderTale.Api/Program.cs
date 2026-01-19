@@ -5,8 +5,6 @@ using WanderTale.Models;         // där Trip ligger
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.UseUrls("http://localhost:5064");
-
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=wanderTale.db"));
 
