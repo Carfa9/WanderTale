@@ -1,6 +1,6 @@
 ﻿import {StyleSheet, View} from "react-native";
 import {SafeAreaView} from "react-native-safe-area-context";
-import NewTripForm from "@/components/newTripForm";
+import NewTripForm from "@/components/new-trip-form";
 
 export default function PlanTrip() {
     return(

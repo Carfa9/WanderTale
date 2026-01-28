@@ -1,17 +1,25 @@
 ﻿import React from "react";
-import { View, Text, TextInput, StyleSheet } from "react-native";
-import { useForm, Controller } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { AppText } from "@/components/appText";
+import {View, Text, StyleSheet} from "react-native";
+import {useForm, Controller, SubmitHandler} from "react-hook-form";
+import {z} from "zod";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {AppText} from "@/components/app-text";
 import {InlineLabelInput} from "@/components/inlineLableInput";
+import {InlineLabelSelect} from "@/components/inline-label-select";
+import {transportOptions, TravelModeKey, travelModeKeys} from "@/data/transport-options";
+import TravelModePickerModal from "@/components/travel-mode-picker-modal";
+
+const onSubmit: SubmitHandler<FormData> = (data) => {
+    console.log("SUBMIT", data);
+};
 
 const schema = z
     .object({
         title: z.string().trim().min(1, "Titel krävs"),
         startDate: z.string().trim().min(1, "Välj startdatum"),
         endDate: z.string().trim().min(1, "Välj slutdatum"),
-        travelMode: z.string().trim().min(1, "Välj färdsätt"),
+        travelMode: z.enum(travelModeKeys).optional()
+            .refine((v) => !!v, { message: "Välj färdsätt" }),
         description: z.string().trim().optional(),
     })
     .refine(
@@ -22,27 +30,25 @@ const schema = z
         }
     );
 
-// OBS: ovan jämför strängar. Det funkar bra om du använder YYYY-MM-DD.
-// Om du skriver 2026-01-10 osv blir ordningen korrekt.
-
 type FormData = z.infer<typeof schema>;
 
 export default function NewTripForm() {
-    const {
-        control,
-        handleSubmit,
-        formState: { errors },
-    } = useForm<FormData>({
-        resolver: zodResolver(schema),
+    
+    const form = useForm<FormData>({
+        resolver: zodResolver(schema) as any,
         defaultValues: {
             title: "",
             startDate: "",
             endDate: "",
-            travelMode: "",
+            travelMode: undefined,
             description: "",
         },
         mode: "onBlur",
     });
+
+    const { control, handleSubmit, formState: { errors } } = form;
+
+    const [modeOpen, setModeOpen] = React.useState(false);
 
     const onSubmit = (data: FormData) => {
         console.log("SUBMIT", data);
@@ -53,24 +59,23 @@ export default function NewTripForm() {
             <Controller
                 control={control}
                 name="title"
-                render={({ field: { onChange, onBlur, value } }) => (
+                render={({field: {onChange, onBlur, value}}) => (
                     <InlineLabelInput
-                        label="Titel"
+                        label="Titel: "
                         onBlur={onBlur}
                         onChangeText={onChange}
                         value={value}
-                        placeholder="T.ex. Slovenien 2026"
                     />
                 )}
             />
             {!!errors.title?.message && <Text style={styles.error}>{errors.title.message}</Text>}
-            
+
             <Controller
                 control={control}
                 name="startDate"
-                render={({ field: { onChange, onBlur, value } }) => (
+                render={({field: {onChange, onBlur, value}}) => (
                     <InlineLabelInput
-                        label="Startdatum"
+                        label="Startdatum:"
                         onBlur={onBlur}
                         onChangeText={onChange}
                         value={value}
@@ -81,13 +86,13 @@ export default function NewTripForm() {
             {!!errors.startDate?.message && (
                 <Text style={styles.error}>{errors.startDate.message}</Text>
             )}
-            
+
             <Controller
                 control={control}
                 name="endDate"
-                render={({ field: { onChange, onBlur, value } }) => (
+                render={({field: {onChange, onBlur, value}}) => (
                     <InlineLabelInput
-                        label="Slutdatum"
+                        label="Slutdatum:"
                         onBlur={onBlur}
                         onChangeText={onChange}
                         value={value}
@@ -96,28 +101,41 @@ export default function NewTripForm() {
                 )}
             />
             {!!errors.endDate?.message && <Text style={styles.error}>{errors.endDate.message}</Text>}
-            
+
             <Controller
                 control={control}
                 name="travelMode"
-                render={({ field: { onChange, onBlur, value } }) => (
-                    <InlineLabelInput
-                        label={"Färdsätt"}
-                        onBlur={onBlur}
-                        onChangeText={onChange}
-                        value={value}
-                        placeholder="Bil, tåg, flyg..."
-                    />
-                )}
+                render={({field: { onChange, onBlur, value } }) => {
+                  
+                    return (
+                        <>
+                            <InlineLabelSelect
+                                label="Färdsätt:"
+                                value={value}
+                                onPress={() => setModeOpen(true)}
+                            />
+
+                            <TravelModePickerModal
+                                visible={modeOpen}
+                                value={value}
+                                onClose={() => setModeOpen(false)}
+                                onSelect={(key: TravelModeKey) => {
+                                    onChange(key);
+                                    setModeOpen(false);
+                                }}
+                            />
+                        </>
+                    );
+                }}
             />
             {!!errors.travelMode?.message && (
                 <Text style={styles.error}>{errors.travelMode.message}</Text>
             )}
-            
+
             <Controller
                 control={control}
                 name="description"
-                render={({ field: { onChange, onBlur, value } }) => (
+                render={({field: {onChange, onBlur, value}}) => (
                     <InlineLabelInput
                         label={"Beskrivning"}
                         onBlur={onBlur}
@@ -143,8 +161,8 @@ export default function NewTripForm() {
 }
 
 const styles = StyleSheet.create({
-    container: { padding: 50, gap: 20 },
-    label: { marginTop: 10 },
+    container: {padding: 50, gap: 20},
+    label: {marginTop: 10},
     input: {
         borderColor: "gray",
         borderWidth: 1,
@@ -152,7 +170,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 10,
     },
-    textarea: { minHeight: 90, textAlignVertical: "top" },
-    error: { color: "red", marginTop: 4 },
-    submit: { marginTop: 16, fontSize: 20 },
+    textarea: {minHeight: 90, textAlignVertical: "top"},
+    error: {color: "red", marginTop: 4},
+    submit: {marginTop: 16, fontSize: 20},
 });
