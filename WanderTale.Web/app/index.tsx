@@ -5,7 +5,7 @@ import {SafeAreaView} from "react-native-safe-area-context";
 import {Ionicons} from "@expo/vector-icons";
 import {router} from "expo-router";
 import {useMemo, useState} from "react";
-import {AppText} from "@/components/appText";
+import {AppText} from "@/components/app-text";
 
 type Trip = { id: string; title: string; startDate: string | null; endDate: string | null };
 

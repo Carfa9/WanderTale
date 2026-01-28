@@ -6,8 +6,9 @@ import { Image } from "expo-image";
 
 type Props = {
     visible: boolean;
-    value: TravelModeKey | undefined;
+    value: TravelModeKey[];
     onClose: () => void;
+    onDone?: () => void;
     onSelect: (key: TravelModeKey) => void;
 };
 
@@ -21,7 +22,7 @@ export default function TravelModePickerModal({visible, value, onClose, onSelect
                 <AppText style={styles.title}>Färdsätt:</AppText>
                 <View style={styles.row}>
                     {transportOptions.map((option) => {
-                        const selected = option.key === value;
+                        const selected = value.includes(option.key);
                         return (
                             <Pressable
                                 key={option.key}

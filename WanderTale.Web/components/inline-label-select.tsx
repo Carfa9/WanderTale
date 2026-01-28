@@ -1,37 +1,44 @@
 ﻿import {Pressable, View, StyleSheet} from "react-native";
 import {AppText} from "@/components/app-text";
 import {Ionicons} from "@expo/vector-icons";
-import { Image } from "expo-image";
+import {Image} from "expo-image";
 import {transportOptions, TravelModeKey} from "@/data/transport-options";
 import React from "react";
 
 type Props = {
     label: string;
-    value?: TravelModeKey;
+    value?: TravelModeKey[];
     placeholder?: string;
     onPress: () => void;
 };
 
-export function InlineLabelSelect({ label, value, placeholder, onPress }: Props) {
-    const selectedOption = transportOptions.find(o => o.key === value);
+export function InlineLabelSelect({label, value = [], placeholder, onPress}: Props) {
     return (
         <Pressable onPress={onPress}>
             <View style={styles.wrapper}>
                 <AppText style={styles.inlineLabel}>{label}</AppText>
                 <View style={styles.valueArea}>
-                    {selectedOption ? (
-                        <Image
-                            source={selectedOption.image}
-                            style={styles.icon}
-                            contentFit="contain"
-                        />
+                    {value.length === 0 ? (
+                        <AppText style={styles.placeholder}></AppText>
                     ) : (
-                        <AppText style={styles.placeholder}>
-                        </AppText>
+                        <View style={styles.icons}>
+                            {value.map((key) => {
+                                const opt = transportOptions.find((o) => o.key === key);
+                                if (!opt) return null;
+
+                                return (
+                                    <Image
+                                        key={key}
+                                        source={opt.image}
+                                        style={styles.icon}
+                                        contentFit="contain"
+                                    />
+                                );
+                            })}
+                        </View>
                     )}
                 </View>
-
-                <Ionicons name="chevron-down" size={18} color="#9aa0a6" />
+                <Ionicons name="chevron-down" size={18} color="#9aa0a6"/>
             </View>
         </Pressable>
     );
@@ -61,7 +68,14 @@ const styles = StyleSheet.create({
     placeholder: {
         opacity: 0.55,
     },
-    icon: {  width: 32,
-        height: 32, },
+    icons: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 8,
+    },
+    icon: {
+        width: 32,
+        height: 32,
+    },
 
-                    });
+});

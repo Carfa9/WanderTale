@@ -18,8 +18,7 @@ const schema = z
         title: z.string().trim().min(1, "Titel krävs"),
         startDate: z.string().trim().min(1, "Välj startdatum"),
         endDate: z.string().trim().min(1, "Välj slutdatum"),
-        travelMode: z.enum(travelModeKeys).optional()
-            .refine((v) => !!v, { message: "Välj färdsätt" }),
+        travelModes: z.array(z.enum(travelModeKeys)).min(1, "Välj minst ett färdsätt"),
         description: z.string().trim().optional(),
     })
     .refine(
@@ -40,7 +39,7 @@ export default function NewTripForm() {
             title: "",
             startDate: "",
             endDate: "",
-            travelMode: undefined,
+            travelModes: [],
             description: "",
         },
         mode: "onBlur",
@@ -104,32 +103,37 @@ export default function NewTripForm() {
 
             <Controller
                 control={control}
-                name="travelMode"
-                render={({field: { onChange, onBlur, value } }) => {
+                name="travelModes"
+                render={({field: { onChange, value } }) => {
+                  const selected = value ?? [];
                   
+                  const selectedLabels = selected.map((key) => transportOptions.find((o) => o.key === key)?.label ?? key);
                     return (
                         <>
                             <InlineLabelSelect
                                 label="Färdsätt:"
-                                value={value}
+                                value={selected}
                                 onPress={() => setModeOpen(true)}
                             />
 
                             <TravelModePickerModal
                                 visible={modeOpen}
-                                value={value}
+                                value={selected}
                                 onClose={() => setModeOpen(false)}
                                 onSelect={(key: TravelModeKey) => {
-                                    onChange(key);
-                                    setModeOpen(false);
+                                    const next = selected.includes(key)
+                                        ? selected.filter((k) => k !== key)
+                                        : [...selected, key];
+                                    onChange(next);
                                 }}
+                                onDone={() => setModeOpen(false)}
                             />
                         </>
                     );
                 }}
             />
-            {!!errors.travelMode?.message && (
-                <Text style={styles.error}>{errors.travelMode.message}</Text>
+            {!!errors.travelModes?.message && (
+                <Text style={styles.error}>{errors.travelModes.message}</Text>
             )}
 
             <Controller
