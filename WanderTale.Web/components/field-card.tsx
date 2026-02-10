@@ -1,11 +1,14 @@
 ﻿import {View, StyleSheet} from "react-native";
 import {AppText} from "@/components/app-text";
+import React from "react";
 
 type Props = {
     label: string;
     value?: string | null;
     placeholder?: string;
     children?: React.ReactNode;
+    multiline?: boolean;
+    stackedValue?: boolean;
 };
 
 
@@ -14,28 +17,33 @@ export default function FieldCard({
  value,
  placeholder = "Under planering",
  children,
+  multiline = false,
+    stackedValue = false,
   }: Props) {
     const text = value?.trim() ? value : placeholder;
 
     return (
-        <View style={styles.fieldCard}>
+        <View style={[styles.fieldCard, multiline && styles.fieldCardMultiline]}>
+            <View style={styles.headerRow}>
             <AppText style={styles.fieldLabel}>{label}</AppText>
-
+                {!stackedValue && (
             <View style={styles.right}>
-                {children ? (
-                    children
-                ) : (
-                    <AppText style={styles.fieldValue}>{text}</AppText>
-                )}
+                {children ? children : <AppText style={styles.fieldValue}>{text}</AppText>}
             </View>
+                )}
+        </View>
+            {stackedValue && (
+                <View style={styles.stackBody}>
+                    {children ? children : <AppText style={styles.stackText}>{text}</AppText>}
+                </View>
+            )}
         </View>
     );
 }
 
+
 const styles = StyleSheet.create({
     fieldCard: {
-        flexDirection: "row",
-        alignItems: "center",
         width: "100%",
         maxWidth: 250,
         alignSelf: "center",
@@ -50,13 +58,18 @@ const styles = StyleSheet.create({
         shadowColor: "#000",
         shadowOpacity: 0.08,
         shadowRadius: 6,
-        shadowOffset: {width: 0, height: 3},
+        shadowOffset: { width: 0, height: 3 },
         elevation: 2,
+    },
+
+    headerRow: {
+        flexDirection: "row",
+        alignItems: "center",
     },
 
     fieldLabel: {
         fontSize: 20,
-        textAlign: "left",
+        paddingRight: 8,
     },
 
     fieldValue: {
@@ -66,5 +79,23 @@ const styles = StyleSheet.create({
     right: {
         flex: 1,
         alignItems: "flex-end",
+    },
+
+    fieldCardMultiline: {
+        alignItems: "flex-start",
+    },
+
+    rightMultiline: {
+        justifyContent: "flex-start",
+        alignItems: "stretch",
+    },
+
+    stackBody: {
+        marginTop: 8,
+        width: "100%",
+    },
+
+    stackText: {
+        textAlign: "left",
     },
 })
