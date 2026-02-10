@@ -1,5 +1,5 @@
 ﻿import React from "react";
-import { View, TextInput, StyleSheet, TextInputProps } from "react-native";
+import {View, TextInput, StyleSheet, TextInputProps, Keyboard} from "react-native";
 import { AppText } from "@/components/app-text";
 
 type Props = {
@@ -20,6 +20,9 @@ export function InlineLabelInput({
                                      inputProps,
                                  }: Props) {
     const isMultiline = !!inputProps?.multiline;
+
+    const parentOnSubmit = inputProps?.onSubmitEditing;
+    
     return (
         <View style={[styles.wrapper, isMultiline && styles.wrapperMultiline]}>
             <AppText style={styles.inlineLabel}>{label}</AppText>
@@ -31,6 +34,12 @@ export function InlineLabelInput({
                 onBlur={onBlur}
                 placeholder={placeholder}
                 placeholderTextColor="#9aa0a6"
+                returnKeyType={isMultiline ? "default" : "done"}
+                submitBehavior={isMultiline ? "newline" : "blurAndSubmit"}
+                onSubmitEditing={(e) => {
+                    parentOnSubmit?.(e);
+                    if (!isMultiline) Keyboard.dismiss();
+                }}
                 {...inputProps}
             />
         </View>
@@ -47,7 +56,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
     },
     wrapperMultiline: {
-        alignItems: "flex-start", // label + textarea ska börja uppifrån
+        alignItems: "flex-start",
     },
     inlineLabel: {
         marginRight: 10,
@@ -62,6 +71,6 @@ const styles = StyleSheet.create({
     textarea: {
         minHeight: 90,
         paddingVertical: 6,
-        textAlignVertical: "top", // Android: text börjar högst upp
+        textAlignVertical: "top",
     },
 });

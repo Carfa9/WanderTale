@@ -1,33 +1,42 @@
 ﻿import React from "react";
-import {View, Text, StyleSheet} from "react-native";
-import {useForm, Controller, SubmitHandler} from "react-hook-form";
+import {View, Text, StyleSheet, Pressable} from "react-native";
+import {useForm, Controller} from "react-hook-form";
 import {z} from "zod";
 import {zodResolver} from "@hookform/resolvers/zod";
 import {AppText} from "@/components/app-text";
-import {InlineLabelInput} from "@/components/inlineLableInput";
+import {InlineLabelInput} from "@/components/inline-label-input";
 import {InlineLabelSelect} from "@/components/inline-label-select";
-import {transportOptions, TravelModeKey, travelModeKeys} from "@/data/transport-options";
 import TravelModePickerModal from "@/components/travel-mode-picker-modal";
+import DateInput from "@/components/date-input";
+import {TravelModeKey, travelModeKeys} from "@/types/travelMode";
+import {transportOptions} from "@/components/transport-options";
+import {createTrip} from "@/api/trips";
+import {CreateTripDto} from "@/types/trip";
 
-const onSubmit: SubmitHandler<FormData> = (data) => {
-    console.log("SUBMIT", data);
-};
 
 const schema = z
     .object({
         title: z.string().trim().min(1, "Titel krävs"),
-        startDate: z.string().trim().min(1, "Välj startdatum"),
-        endDate: z.string().trim().min(1, "Välj slutdatum"),
+        destination: z.string().trim().optional(),
+        startDate: z.string().nullable(),
+        endDate: z.string().nullable(),
         travelModes: z.array(z.enum(travelModeKeys)).min(1, "Välj minst ett färdsätt"),
         description: z.string().trim().optional(),
     })
     .refine(
-        (data) => data.endDate >= data.startDate,
+        (data) => !data.startDate || !data.endDate || data.endDate >= data.startDate,
         {
             message: "Slutdatum kan inte vara före startdatum",
             path: ["endDate"],
         }
-    );
+    )
+    .refine(
+    (data) => !data.startDate || !data.endDate || data.startDate <= data.endDate,
+    {
+        message: "Startdatum kan inte vara efter slutdatum",
+        path: ["startDate"],
+    }
+);
 
 type FormData = z.infer<typeof schema>;
 
@@ -37,20 +46,42 @@ export default function NewTripForm() {
         resolver: zodResolver(schema) as any,
         defaultValues: {
             title: "",
-            startDate: "",
-            endDate: "",
+            destination: "",
+            startDate: null,
+            endDate: null,
             travelModes: [],
             description: "",
         },
         mode: "onBlur",
     });
 
-    const { control, handleSubmit, formState: { errors } } = form;
+    const {
+        control,
+        handleSubmit,
+        getValues,
+        setValue,
+        setError,
+        clearErrors,
+        formState: { errors },
+    } = form;
 
     const [modeOpen, setModeOpen] = React.useState(false);
 
-    const onSubmit = (data: FormData) => {
-        console.log("SUBMIT", data);
+
+    const onSubmit = async (data: FormData) => {
+        try {
+            console.log("SUBMIT", data);
+            const dto: CreateTripDto = {
+                ...data,
+                destination: data.destination ?? null,
+                description: data.description ?? null,
+            };
+            const created = await createTrip(dto);
+            console.log("CREATED", created);
+            form.reset();
+        } catch (e) {
+            console.log("CREATE TRIP ERROR", e);
+        }        
     };
 
     return (
@@ -71,14 +102,42 @@ export default function NewTripForm() {
 
             <Controller
                 control={control}
-                name="startDate"
+                name="destination"
                 render={({field: {onChange, onBlur, value}}) => (
                     <InlineLabelInput
-                        label="Startdatum:"
+                        label="Destination: "
                         onBlur={onBlur}
                         onChangeText={onChange}
-                        value={value}
-                        placeholder="YYYY-MM-DD"
+                        value={value ?? ""}
+                    />
+                )}
+            />
+            {!!errors.title?.message && <Text style={styles.error}>{errors.title.message}</Text>}
+
+            <Controller
+                control={control}
+                name="startDate"
+                render={({ field: { onChange, value } }) => (
+                    <DateInput
+                        label="Startdatum:"
+                        value={value ? new Date(value) : null}
+                        onChange={(date) => {
+                            const iso = date.toISOString();
+                            const end = getValues("endDate"); 
+
+                            if (end && iso > end) {
+                                setValue("startDate", end, { shouldDirty: true, shouldTouch: true });
+                                setError("startDate", {
+                                    type: "manual",
+                                    message: "Startdatum kan inte vara efter slutdatum",
+                                });
+                                return;
+                            }
+
+                            // OK
+                            onChange(iso);
+                            clearErrors("startDate");
+                        }}
                     />
                 )}
             />
@@ -89,13 +148,28 @@ export default function NewTripForm() {
             <Controller
                 control={control}
                 name="endDate"
-                render={({field: {onChange, onBlur, value}}) => (
-                    <InlineLabelInput
+                render={({ field: { onChange, value } }) => (
+                    <DateInput
                         label="Slutdatum:"
-                        onBlur={onBlur}
-                        onChangeText={onChange}
-                        value={value}
-                        placeholder="YYYY-MM-DD"
+                        value={value ? new Date(value) : null}
+                        onChange={(date) => {
+                            const iso = date.toISOString();
+                            const start = getValues("startDate");
+
+                            if (start && iso < start) {
+                             
+                                setValue("endDate", start, { shouldDirty: true, shouldTouch: true });
+                                setError("endDate", {
+                                    type: "manual",
+                                    message: "Slutdatum kan inte vara före startdatum",
+                                });
+                                return;
+                            }
+
+                            // OK
+                            onChange(iso);
+                            clearErrors("endDate");
+                        }}
                     />
                 )}
             />
@@ -156,17 +230,28 @@ export default function NewTripForm() {
             {!!errors.description?.message && (
                 <Text style={styles.error}>{errors.description.message}</Text>
             )}
-
-            <AppText onPress={handleSubmit(onSubmit)} style={styles.submit}>
+            <Pressable style={styles.submitButton} onPress={handleSubmit((data) => {
+                onSubmit(data);
+                form.reset();
+            })}>
+            <AppText style={styles.submit}>
                 Skapa resa
             </AppText>
+            </Pressable>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {padding: 50, gap: 20},
-    label: {marginTop: 10},
+    container: {
+        padding: 50, 
+        gap: 20
+    },
+    
+    label: {
+        marginTop: 10
+    },
+    
     input: {
         borderColor: "gray",
         borderWidth: 1,
@@ -174,7 +259,30 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 10,
     },
-    textarea: {minHeight: 90, textAlignVertical: "top"},
-    error: {color: "red", marginTop: 4},
-    submit: {marginTop: 16, fontSize: 20},
+    textarea: {
+        minHeight: 90, 
+        textAlignVertical: "top"
+    },
+    
+    error: {
+        color: "red", 
+        marginTop: 4
+    },
+    
+    submit: {
+        fontSize: 20, 
+        textAlignVertical: "center", 
+        alignSelf: "center"
+    },
+    
+    submitButton: {
+        alignSelf: "center",
+        width: "100%",
+        maxWidth: 350,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 12,
+        backgroundColor: "#D5F7F4",
+        borderWidth: 1,
+        borderColor: "rgba(0,0,0,0.08)",},
 });

@@ -50,7 +50,10 @@ function HomeOverlayButton() {
             ]}
         >
             <Pressable
-                onPress={() => router.replace("/")}
+                onPress={() => {
+                    router.dismissAll();
+                    router.replace("/");
+                }}
                 hitSlop={12}
                 style={({ pressed }) => [styles.homeBtn, pressed && styles.homeBtnPressed]}
             >

@@ -52,6 +52,42 @@ namespace WanderTale.Migrations
 
                     b.ToTable("Trips");
                 });
+
+            modelBuilder.Entity("WanderTale.Models.TripTravelMode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TripId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TripId");
+
+                    b.ToTable("TripTravelModes");
+                });
+
+            modelBuilder.Entity("WanderTale.Models.TripTravelMode", b =>
+                {
+                    b.HasOne("WanderTale.Models.Trip", "Trip")
+                        .WithMany("TravelModes")
+                        .HasForeignKey("TripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Trip");
+                });
+
+            modelBuilder.Entity("WanderTale.Models.Trip", b =>
+                {
+                    b.Navigation("TravelModes");
+                });
 #pragma warning restore 612, 618
         }
     }

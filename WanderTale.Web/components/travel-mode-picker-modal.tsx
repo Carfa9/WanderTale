@@ -1,8 +1,9 @@
 ﻿import React from "react";
-import {transportOptions, TravelModeKey} from "@/data/transport-options";
 import {Modal, Pressable, StyleSheet, View} from "react-native";
 import {AppText} from "@/components/app-text";
 import { Image } from "expo-image";
+import {TravelModeKey} from "@/types/travelMode";
+import {transportOptionList} from "@/components/transport-options";
 
 type Props = {
     visible: boolean;
@@ -21,7 +22,7 @@ export default function TravelModePickerModal({visible, value, onClose, onSelect
             <View style={styles.sheet}>
                 <AppText style={styles.title}>Färdsätt:</AppText>
                 <View style={styles.row}>
-                    {transportOptions.map((option) => {
+                    {transportOptionList.map((option) => {
                         const selected = value.includes(option.key);
                         return (
                             <Pressable

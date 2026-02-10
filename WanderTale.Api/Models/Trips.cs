@@ -14,5 +14,13 @@ public class Trip
     
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-    
+    public List<TripTravelMode> TravelModes { get; set; } = new();
+}
+
+public class TripTravelMode
+{
+    public int Id { get; set; }
+    public int TripId { get; set; }
+    public Trip Trip { get; set; } = null!;
+    public string Mode { get; set; } = ""; // "car"
 }

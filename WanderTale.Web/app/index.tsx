@@ -6,24 +6,9 @@ import {Ionicons} from "@expo/vector-icons";
 import {router} from "expo-router";
 import {useMemo, useState} from "react";
 import {AppText} from "@/components/app-text";
+import {Trip} from "@/types/trip";
+import {FormatDate, SafeDate} from "@/components/format-date";
 
-type Trip = { id: string; title: string; startDate: string | null; endDate: string | null };
-
-function safeDate(value: string | null) {
-    if (!value) return null;
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? null : d;
-}
-
-function formatDate(value: string | null) {
-    const d = safeDate(value);
-    if (!d) return "—";
-    return d.toLocaleDateString("sv-SE", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-    });
-}
 
 export default function Index() {
     const {data, isLoading, error} = useQuery<Trip[]>({
@@ -39,24 +24,24 @@ export default function Index() {
         const today = new Date();
 
         const upcoming = trips.filter((t) => {
-            const end = safeDate(t.endDate);
+            const end = SafeDate(t.endDate);
             return end ? end >= today : true;
         });
 
         const done = trips.filter((t) => {
-            const end = safeDate(t.endDate);
+            const end = SafeDate(t.endDate);
             return end ? end < today : false;
         });
 
         upcoming.sort((a, b) => {
-            const aStart = safeDate(a.startDate)?.getTime() ?? 0;
-            const bStart = safeDate(b.startDate)?.getTime() ?? 0;
+            const aStart = SafeDate(a.startDate)?.getTime() ?? 0;
+            const bStart = SafeDate(b.startDate)?.getTime() ?? 0;
             return aStart - bStart;
         });
 
         done.sort((a, b) => {
-            const aEnd = safeDate(a.endDate)?.getTime() ?? 0;
-            const bEnd = safeDate(b.endDate)?.getTime() ?? 0;
+            const aEnd = SafeDate(a.endDate)?.getTime() ?? 0;
+            const bEnd = SafeDate(b.endDate)?.getTime() ?? 0;
             return bEnd - aEnd;
         });
 
@@ -67,7 +52,7 @@ export default function Index() {
         <SafeAreaView style={styles.screen}>
             {isLoading && (
                 <Text style={{padding: 16}}>
-                    Loading...
+                    Laddar...
                 </Text>
             )}
 
@@ -81,7 +66,7 @@ export default function Index() {
                     <View style={styles.top}>
                         <AppText size={40}>Mina resor</AppText>
                         <View style={styles.newTrip}>
-                            <Pressable style={{alignItems: "center"}} onPress={() => router.push("/planTrip")}>
+                            <Pressable style={{alignItems: "center"}} onPress={() => router.push("/plan-trip")}>
                                 <Ionicons name="location-outline" size={40} color="#333"/>
                                 <AppText style={styles.iconText}>Ny resa</AppText>
                             </Pressable>
@@ -94,7 +79,8 @@ export default function Index() {
                         >
                             <View style={styles.sectionTabs}>
                                 <Pressable onPress={() => setActive("upcoming")} hitSlop={10}>
-                                    <AppText style={[styles.sectionTab, active === "upcoming" && styles.sectionTabActive]}>
+                                    <AppText
+                                        style={[styles.sectionTab, active === "upcoming" && styles.sectionTabActive]}>
                                         Kommande
                                     </AppText>
                                 </Pressable>
@@ -110,11 +96,14 @@ export default function Index() {
                                 data={visibleTrips}
                                 keyExtractor={(trip) => trip.id}
                                 renderItem={({item}) => (
-                                    <Pressable style={styles.tripCard}>
+                                    <Pressable style={styles.tripCard} onPress={() => router.push({
+                                        pathname: "/trip-details/[id]",
+                                        params: {id: item.id},
+                                    })}>
                                         <View style={styles.tripRow}>
                                             <AppText style={styles.tripTitle}>{item.title}</AppText>
                                             <Text style={styles.tripDate}>
-                                                {formatDate(item.startDate)}
+                                                {FormatDate(item.startDate)}
                                             </Text>
                                         </View>
                                     </Pressable>
@@ -176,7 +165,7 @@ const styles = StyleSheet.create({
         alignItems: "flex-end",
         justifyContent: "space-between",
     },
-    sectionTab: {        
+    sectionTab: {
         opacity: 0.40,
         fontSize: 23,
         lineHeight: 30,
@@ -194,9 +183,14 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 14,
         borderRadius: 12,
-        backgroundColor: "#D5F7F4",
+        backgroundColor: "rgba(213, 247, 244, 0.85)",
         borderWidth: 1,
         borderColor: "rgba(0,0,0,0.08)",
+        shadowColor: "#000",
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+        shadowOffset: {width: 0, height: 3},
+        elevation: 3,
     },
     tripTitle: {
         fontSize: 20,
