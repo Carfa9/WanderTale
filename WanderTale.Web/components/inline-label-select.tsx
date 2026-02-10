@@ -2,8 +2,10 @@
 import {AppText} from "@/components/app-text";
 import {Ionicons} from "@expo/vector-icons";
 import {Image} from "expo-image";
-import {transportOptions, TravelModeKey} from "@/data/transport-options";
 import React from "react";
+import {TravelModeKey} from "@/types/travelMode";
+import {transportOptionList} from "@/components/transport-options";
+
 
 type Props = {
     label: string;
@@ -23,7 +25,7 @@ export function InlineLabelSelect({label, value = [], placeholder, onPress}: Pro
                     ) : (
                         <View style={styles.icons}>
                             {value.map((key) => {
-                                const opt = transportOptions.find((o) => o.key === key);
+                                const opt = transportOptionList.find((o) => o.key === key);
                                 if (!opt) return null;
 
                                 return (

@@ -9,9 +9,9 @@ import {InlineLabelSelect} from "@/components/inline-label-select";
 import TravelModePickerModal from "@/components/travel-mode-picker-modal";
 import DateInput from "@/components/date-input";
 import {TravelModeKey, travelModeKeys} from "@/types/travelMode";
-import {transportOptions} from "@/components/transport-options";
 import {createTrip} from "@/api/trips";
 import {CreateTripDto} from "@/types/trip";
+import {transportOptionList} from "@/components/transport-options";
 
 
 const schema = z
@@ -181,7 +181,7 @@ export default function NewTripForm() {
                 render={({field: { onChange, value } }) => {
                   const selected = value ?? [];
                   
-                  const selectedLabels = selected.map((key) => transportOptions.find((o) => o.key === key)?.label ?? key);
+                  const selectedLabels = selected.map((key) => transportOptionList.find((o) => o.key === key)?.label ?? key);
                     return (
                         <>
                             <InlineLabelSelect
