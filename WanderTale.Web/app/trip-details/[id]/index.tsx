@@ -37,10 +37,9 @@ function toModeArray(travelMode: unknown): TravelModeKey[] {
     return [];
 }
 
-
 export default function TripDetails() {
 
-    const {id} = useLocalSearchParams<{ id: string }>();
+    const {id} = useLocalSearchParams<{ id: string | string[] }>();
 
     const {data: trip, isLoading, error} = useQuery({
         queryKey: ["trip", id],
@@ -102,9 +101,8 @@ export default function TripDetails() {
                             </FieldCard>
 
                             <View style={styles.buttonContainer}>
-                                <Pressable style={styles.addButton} onPress={() => router.push({
-                                    pathname: "./notes/new"
-                                })}>
+                                <Pressable style={styles.addButton} onPress={() => router.push(`/trip-details/${id}/entries/new-entry`)
+                                }>
                                     <AppText style={styles.addButtonText}>Lägg till anteckning</AppText>
                                 </Pressable>
                                 <Pressable style={[styles.addButton, styles.addButtonSecond]}>

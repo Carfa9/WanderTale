@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi;          // för OpenApiInfo
-using WanderTale;                // där AppDbContext ligger
-using WanderTale.Models;         // där Trip ligger
+using Microsoft.OpenApi; // för OpenApiInfo
+using WanderTale;
+using WanderTale.Dto; // där AppDbContext ligger
+using WanderTale.Models; // där Trip ligger
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,7 +36,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var conn = db.Database.GetDbConnection();
-    
+
     var tables = await db.Database
         .SqlQueryRaw<string>("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;")
         .ToListAsync();
@@ -56,15 +57,12 @@ using (var scope = app.Services.CreateScope())
 app.UseCors("AllowFrontend");
 
 app.UseSwagger();
-app.UseSwaggerUI(c =>
-{
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "WanderTale API v1");
-});
+app.UseSwaggerUI(c => { c.SwaggerEndpoint("/swagger/v1/swagger.json", "WanderTale API v1"); });
 
 app.MapGet("/trips", async (AppDbContext db) =>
     await db.Trips.ToListAsync());
 
-app.MapGet("/trips/{id:int}", async (AppDbContext db, int id) =>
+app.MapGet("/trips/{id:guid}", async (AppDbContext db, Guid id) =>
 {
     var trip = await db.Trips
         .Include(t => t.TravelModes)
@@ -87,39 +85,40 @@ app.MapPost("/trips", async (AppDbContext db, CreateTripRequest request) =>
     try
     {
         Console.WriteLine("POST /trips hit");
-        Console.WriteLine($"TravelModes in request: {(request.TravelModes is null ? "null" : string.Join(",", request.TravelModes))}");
-        
-    var now = DateTime.UtcNow;
-    
-    var trip = new Trip
-    {
-        Title = request.Title,
-        Destination = request.Destination,
-        Description = request.Description,
-        StartDate = request.StartDate,
-        EndDate = request.EndDate,
-        CreatedAt = now,
-        UpdatedAt = now,
-        TravelModes = (request.TravelModes ?? new())
-            .Select(m => new TripTravelMode { Mode = m })
-            .ToList()
-    };
-    
-    db.Trips.Add(trip);
-    await db.SaveChangesAsync();
-    
-    return Results.Created($"/trips/{trip.Id}", new
-    {
-        trip.Id,
-        trip.Title,
-        trip.Destination,
-        trip.StartDate,
-        trip.EndDate,
-        trip.Description,
-        trip.CreatedAt,
-        trip.UpdatedAt,
-        TravelModes = trip.TravelModes.Select(x => x.Mode)
-    });
+        Console.WriteLine(
+            $"TravelModes in request: {(request.TravelModes is null ? "null" : string.Join(",", request.TravelModes))}");
+
+        var now = DateTime.UtcNow;
+
+        var trip = new Trip
+        {
+            Title = request.Title,
+            Destination = request.Destination,
+            Description = request.Description,
+            StartDate = request.StartDate,
+            EndDate = request.EndDate,
+            CreatedAt = now,
+            UpdatedAt = now,
+            TravelModes = (request.TravelModes ?? new())
+                .Select(m => new TripTravelMode { Mode = m })
+                .ToList()
+        };
+
+        db.Trips.Add(trip);
+        await db.SaveChangesAsync();
+
+        return Results.Created($"/trips/{trip.Id}", new
+        {
+            trip.Id,
+            trip.Title,
+            trip.Destination,
+            trip.StartDate,
+            trip.EndDate,
+            trip.Description,
+            trip.CreatedAt,
+            trip.UpdatedAt,
+            TravelModes = trip.TravelModes.Select(x => x.Mode)
+        });
     }
     catch (Exception ex)
     {
@@ -128,5 +127,24 @@ app.MapPost("/trips", async (AppDbContext db, CreateTripRequest request) =>
         return Results.Problem(ex.ToString());
     }
 });
+app.MapPost("/trips/{tripId:guid}/entries", async (AppDbContext db, Guid tripId, CreateEntryRequest req) =>
+    {
+        var entry = new Entry
+        {
+            Id = Guid.NewGuid(),
+            TripId = tripId,
+            EntryDate = req.EntryDate,
+            Title = req.Title,
+            Content = req.Content,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        db.Entries.Add(entry);
+        await db.SaveChangesAsync();
+
+        return Results.Ok(entry);
+    }
+);
 
 app.Run();

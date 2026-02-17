@@ -12,4 +12,5 @@ public class AppDbContext : DbContext
     
     public DbSet<Trip> Trips => Set<Trip>();
     public DbSet<TripTravelMode> TripTravelModes => Set<TripTravelMode>();
+    public DbSet<Entry> Entries => Set<Entry>();
 }
