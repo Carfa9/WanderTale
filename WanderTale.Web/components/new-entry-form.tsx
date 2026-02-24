@@ -1,0 +1,187 @@
+﻿import React from "react";
+import {View, Text, StyleSheet, Pressable} from "react-native";
+import {useForm, Controller} from "react-hook-form";
+import {z} from "zod";
+import {zodResolver} from "@hookform/resolvers/zod";
+import {AppText} from "@/components/app-text";
+import {InlineLabelInput} from "@/components/inline-label-input";
+import DateInput from "@/components/date-input";
+
+import {createEntry} from "@/api/entries";
+import {CreateEntryDto} from "@/types/entry";
+
+
+const schema = z
+    .object({
+        entryDate: z.string().nullable(),
+        title: z.string().trim().optional(),
+        content: z.string().trim().optional(),
+    });
+
+
+type FormData = z.infer<typeof schema>;
+
+export default function NewEntryForm() {
+
+    const form = useForm<FormData>({
+        resolver: zodResolver(schema) as any,
+        defaultValues: {
+            entryDate: null,
+            title: "",
+            content: "",
+        },
+        mode: "onBlur",
+    });
+
+    const {
+        control,
+        handleSubmit,
+        getValues,
+        setValue,
+        setError,
+        clearErrors,
+        formState: {errors},
+    } = form;
+
+
+    const onSubmit = async (data: FormData) => {
+        try {
+            console.log("SUBMIT", data);
+            const dto: CreateEntryDto = {
+                ...data,
+                title: data.title ?? null,
+                content: data.content ?? null,
+            };
+            const created = await createEntry(dto);
+            console.log("CREATED", created);
+            form.reset();
+        } catch (e) {
+            console.log("CREATE ENTRY ERROR", e);
+        }
+    };
+
+    return (
+        <View style={styles.container}>
+            <View style={styles.fields}>
+            <Controller
+                control={control}
+                name="entryDate"
+                render={({field: {onChange, value}}) => (
+                    <DateInput
+                        label="När:"
+                        value={value ? new Date(value) : null}
+                        onChange={(date) => {
+                            const iso = date.toISOString();
+
+                            onChange(iso);
+                            clearErrors("entryDate");
+                        }}
+                    />
+                )}
+            />
+            {!!errors.entryDate?.message && (
+                <Text style={styles.error}>{errors.entryDate.message}</Text>
+            )}
+
+
+            <Controller
+                control={control}
+                name="title"
+                render={({field: {onChange, onBlur, value}}) => (
+                    <InlineLabelInput
+                        label="Var: "
+                        onBlur={onBlur}
+                        onChangeText={onChange}
+                        value={value ?? ""}
+                    />
+                )}
+            />
+            {!!errors.title?.message && <Text style={styles.error}>{errors.title.message}</Text>}
+
+            <Controller
+                control={control}
+                name="content"
+                render={({field: {onChange, onBlur, value}}) => (
+                    <InlineLabelInput
+                        label=""
+                        onBlur={onBlur}
+                        onChangeText={onChange}
+                        value={value ?? ""}
+                        inputProps={{
+                            multiline: true,
+                            numberOfLines: 20,
+                        }}
+
+                    />
+                )}
+            />
+            {!!errors.content?.message && <Text style={styles.error}>{errors.content.message}</Text>}
+            </View>
+
+            <View style={styles.footer}>
+            <Pressable style={styles.submitButton} onPress={handleSubmit((data) => {
+                onSubmit(data);
+                form.reset();
+            })}>
+                <AppText style={styles.submit}>
+                    Spara
+                </AppText>
+            </Pressable>
+        </View>
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,        
+        padding: 50,
+        gap: 20,
+    },
+    fields: {
+        gap: 20,
+    },
+    footer: {
+        marginTop: "auto",
+        paddingTop: 16,
+    },
+
+    label: {
+        marginTop: 10
+    },
+
+    input: {
+        borderColor: "white",
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    textarea: {
+        minHeight: 90,
+        textAlignVertical: "top"
+    },
+
+    error: {
+        color: "red",
+        marginTop: 4
+    },
+
+    submit: {
+        fontSize: 20,
+        textAlignVertical: "center",
+        alignSelf: "center"
+    },
+
+    submitButton: {
+        alignSelf: "center",
+        width: "100%",
+        maxWidth: 350,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 12,
+        backgroundColor: "#D5F7F4",
+        borderWidth: 1,
+        borderColor: "rgba(0,0,0,0.08)",
+    },
+});
