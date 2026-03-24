@@ -1,4 +1,5 @@
-﻿public record CreateTripRequest(
+﻿namespace WanderTale.Dto;
+public record CreateTripRequest(
     string Title,
     string? Destination,
     string? Description,

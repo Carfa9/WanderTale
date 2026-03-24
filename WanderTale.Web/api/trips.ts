@@ -1,6 +1,5 @@
 ﻿import {CreateTripDto, Trip} from "@/types/trip";
-
-const api_url = "http://192.168.50.82:5064";
+import {api_url} from "@/api/config";
 
 export async function getTrips() {
     const response = await fetch(`${api_url}/trips`);

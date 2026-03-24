@@ -50,10 +50,11 @@ const styles = StyleSheet.create({
     wrapper: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#d9d9d9",
+        backgroundColor: "white",
         borderRadius: 4,
         paddingHorizontal: 10,
         paddingVertical: 10,
+        boxShadow: "0px 0px 10px rgba(0,0,0,0.3)",
     },
     inlineLabel: {
         marginRight: 10,

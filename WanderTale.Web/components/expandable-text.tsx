@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
         alignSelf: "stretch",
     },
     text: {
-        paddingRight: 22, // plats för chevron
+        paddingRight: 22,
     },
     measureText: {
         position: "absolute",

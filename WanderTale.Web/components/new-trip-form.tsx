@@ -133,8 +133,7 @@ export default function NewTripForm() {
                                 });
                                 return;
                             }
-
-                            // OK
+                            
                             onChange(iso);
                             clearErrors("startDate");
                         }}
@@ -165,8 +164,7 @@ export default function NewTripForm() {
                                 });
                                 return;
                             }
-
-                            // OK
+                            
                             onChange(iso);
                             clearErrors("endDate");
                         }}

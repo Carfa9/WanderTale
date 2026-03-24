@@ -10,6 +10,7 @@ import {TravelModeKey} from "@/types/travelMode";
 import {transportOptionsByKey} from "@/components/transport-options";
 import {Image} from "expo-image";
 import {ExpandableText} from "@/components/expandable-text";
+import TripSectionTabs from "@/components/trip-section-tabs";
 
 
 const FullScreenMessage = ({children}: { children: React.ReactNode }) => (
@@ -25,26 +26,15 @@ const FullScreenMessage = ({children}: { children: React.ReactNode }) => (
     </SafeAreaView>
 );
 
-function toModeArray(travelMode: unknown): TravelModeKey[] {
-    if (!travelMode) return [];
-    if (Array.isArray(travelMode)) return travelMode as TravelModeKey[];
-    if (typeof travelMode === "string") {
-        return travelMode
-            .split(",")
-            .map(s => s.trim())
-            .filter(Boolean) as TravelModeKey[];
-    }
-    return [];
-}
-
 export default function TripDetails() {
 
     const {id} = useLocalSearchParams<{ id: string | string[] }>();
+    const tripId = Array.isArray(id) ? id[0] : id;
 
     const {data: trip, isLoading, error} = useQuery({
-        queryKey: ["trip", id],
-        queryFn: () => getTripById(String(id)),
-        enabled: !!id,
+        queryKey: ["trip", tripId],
+        queryFn: () => getTripById(String(tripId)),
+        enabled: !!tripId,
     });
 
     if (isLoading) return <FullScreenMessage>Laddar…</FullScreenMessage>;
@@ -56,16 +46,22 @@ export default function TripDetails() {
     return (
         <SafeAreaView style={styles.screen}>
             <View style={styles.top}>
-                <AppText size={30}>{trip?.title ?? "Namnlös resa"}</AppText>
+                <View style={styles.titleWrapper}>
+                    <AppText size={30}>
+                        {trip?.title ?? "Namnlös resa"}
+                    </AppText>
+                </View>
             </View>
 
             <View style={styles.bottom}>
+                <TripSectionTabs tripId={tripId}/>
                 <View style={styles.paperStack}>
                     <ImageBackground
                         source={require("@/assets/images/TheWorld.png")}
                         style={styles.paper}
                         imageStyle={styles.paperImg}
                     >
+
                         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}
                                     overScrollMode="never"
                                     contentContainerStyle={styles.scrollContent}>
@@ -101,8 +97,9 @@ export default function TripDetails() {
                             </FieldCard>
 
                             <View style={styles.buttonContainer}>
-                                <Pressable style={styles.addButton} onPress={() => router.push(`/trip-details/${id}/entries/new-entry`)
-                                }>
+                                <Pressable style={styles.addButton}
+                                           onPress={() => router.push(`/trip-details/${tripId}/new-entry`)
+                                           }>
                                     <AppText style={styles.addButtonText}>Lägg till anteckning</AppText>
                                 </Pressable>
                                 <Pressable style={[styles.addButton, styles.addButtonSecond]}>
@@ -124,10 +121,18 @@ const styles = StyleSheet.create({
     },
 
     top: {
-        flex: 1, alignItems: "center",
+        flexDirection: "row",
+        alignItems: "flex-end",
         justifyContent: "center",
+        paddingTop: 10,
+        paddingBottom: 10,
         borderBottomWidth: 15,
-        borderBottomColor: "#C0C0C0"
+        borderBottomColor: "#C0C0C0",
+    },
+
+    titleWrapper: {
+        textAlign: "center",
+        justifyContent: "center",
     },
 
     bottom: {
@@ -136,22 +141,25 @@ const styles = StyleSheet.create({
         paddingHorizontal: 30,
     },
 
+    tabs: {
+        alignItems: "center",
+    },
+
     paperStack: {
         width: "100%",
         alignItems: "center",
         position: "relative",
+        marginTop: 15,
     },
 
     paper: {
         width: "100%",
         alignItems: "center",
-        paddingVertical: 20,
     },
 
     paperImg: {
         resizeMode: "cover",
     },
-
 
     fieldValue: {
         fontSize: 18,

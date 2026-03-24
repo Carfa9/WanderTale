@@ -1,28 +1,28 @@
 ﻿import React from "react";
-import {View, Text, StyleSheet, Pressable} from "react-native";
-import {useForm, Controller} from "react-hook-form";
-import {z} from "zod";
-import {zodResolver} from "@hookform/resolvers/zod";
-import {AppText} from "@/components/app-text";
-import {InlineLabelInput} from "@/components/inline-label-input";
+import { View, Text, StyleSheet, Pressable } from "react-native";
+import { useForm, Controller } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AppText } from "@/components/app-text";
+import { InlineLabelInput } from "@/components/inline-label-input";
 import DateInput from "@/components/date-input";
+import { CreateEntryDto } from "@/dto/createEntryDto";
 
-import {createEntry} from "@/api/entries";
-import {CreateEntryDto} from "@/types/entry";
-
-
-const schema = z
-    .object({
-        entryDate: z.string().nullable(),
-        title: z.string().trim().optional(),
-        content: z.string().trim().optional(),
-    });
-
+const schema = z.object({
+    entryDate: z.string().nullable(),
+    title: z.string().trim().optional(),
+    content: z.string().trim().optional(),
+});
 
 type FormData = z.infer<typeof schema>;
 
-export default function NewEntryForm() {
+type Props = {
+    onSubmit: (dto: CreateEntryDto) => void;
+    isSaving?: boolean;
+    errorMessage?: string;
+};
 
+export default function NewEntryForm({ onSubmit, isSaving, errorMessage }: Props) {
     const form = useForm<FormData>({
         resolver: zodResolver(schema) as any,
         defaultValues: {
@@ -36,101 +36,82 @@ export default function NewEntryForm() {
     const {
         control,
         handleSubmit,
-        getValues,
-        setValue,
-        setError,
         clearErrors,
-        formState: {errors},
+        formState: { errors },
+        reset,
     } = form;
 
+    const submit = (data: FormData) => {
+        const dto: CreateEntryDto = {
+            EntryDate: data.entryDate ?? null,
+            Title: (data.title ?? "").trim(),
+            Content: (data.content ?? "").trim(),
+        };
 
-    const onSubmit = async (data: FormData) => {
-        try {
-            console.log("SUBMIT", data);
-            const dto: CreateEntryDto = {
-                ...data,
-                title: data.title ?? null,
-                content: data.content ?? null,
-            };
-            const created = await createEntry(dto);
-            console.log("CREATED", created);
-            form.reset();
-        } catch (e) {
-            console.log("CREATE ENTRY ERROR", e);
-        }
+        onSubmit(dto);
+        reset();
     };
 
     return (
         <View style={styles.container}>
             <View style={styles.fields}>
-            <Controller
-                control={control}
-                name="entryDate"
-                render={({field: {onChange, value}}) => (
-                    <DateInput
-                        label="När:"
-                        value={value ? new Date(value) : null}
-                        onChange={(date) => {
-                            const iso = date.toISOString();
+                <Controller
+                    control={control}
+                    name="entryDate"
+                    render={({ field: { onChange, value } }) => (
+                        <DateInput
+                            label="När:"
+                            value={value ? new Date(value) : null}
+                            onChange={(date) => {
+                                if (!date) {
+                                    onChange(null);
+                                    return;
+                                }
+                                onChange(date.toISOString());
+                                clearErrors("entryDate");
+                            }}
+                        />
+                    )}
+                />
+                {!!errors.entryDate?.message && <Text style={styles.error}>{errors.entryDate.message}</Text>}
 
-                            onChange(iso);
-                            clearErrors("entryDate");
-                        }}
-                    />
-                )}
-            />
-            {!!errors.entryDate?.message && (
-                <Text style={styles.error}>{errors.entryDate.message}</Text>
-            )}
+                <Controller
+                    control={control}
+                    name="title"
+                    render={({ field: { onChange, onBlur, value } }) => (
+                        <InlineLabelInput label="Var: " onBlur={onBlur} onChangeText={onChange} value={value ?? ""} />
+                    )}
+                />
+                {!!errors.title?.message && <Text style={styles.error}>{errors.title.message}</Text>}
 
-
-            <Controller
-                control={control}
-                name="title"
-                render={({field: {onChange, onBlur, value}}) => (
-                    <InlineLabelInput
-                        label="Var: "
-                        onBlur={onBlur}
-                        onChangeText={onChange}
-                        value={value ?? ""}
-                    />
-                )}
-            />
-            {!!errors.title?.message && <Text style={styles.error}>{errors.title.message}</Text>}
-
-            <Controller
-                control={control}
-                name="content"
-                render={({field: {onChange, onBlur, value}}) => (
-                    <InlineLabelInput
-                        label=""
-                        onBlur={onBlur}
-                        onChangeText={onChange}
-                        value={value ?? ""}
-                        inputProps={{
-                            multiline: true,
-                            numberOfLines: 20,
-                        }}
-
-                    />
-                )}
-            />
-            {!!errors.content?.message && <Text style={styles.error}>{errors.content.message}</Text>}
+                <Controller
+                    control={control}
+                    name="content"
+                    render={({ field: { onChange, onBlur, value } }) => (
+                        <InlineLabelInput
+                            label=""
+                            onBlur={onBlur}
+                            onChangeText={onChange}
+                            value={value ?? ""}
+                            inputStyles={{ minHeight: 240 }}
+                            inputProps={{ multiline: true, numberOfLines: 20 }}
+                        />
+                    )}
+                />
+                {!!errors.content?.message && <Text style={styles.error}>{errors.content.message}</Text>}
             </View>
 
             <View style={styles.footer}>
-            <Pressable style={styles.submitButton} onPress={handleSubmit((data) => {
-                onSubmit(data);
-                form.reset();
-            })}>
-                <AppText style={styles.submit}>
-                    Spara
-                </AppText>
-            </Pressable>
-        </View>
+                {!!errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
+
+                <Pressable style={styles.submitButton} disabled={!!isSaving} onPress={handleSubmit(submit)}>
+                    <AppText style={styles.submit}>{isSaving ? "Sparar..." : "Spara"}</AppText>
+                </Pressable>
+            </View>
         </View>
     );
 }
+
 
 const styles = StyleSheet.create({
     container: {

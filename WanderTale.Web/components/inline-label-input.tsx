@@ -8,6 +8,7 @@ type Props = {
     onChangeText: (text: string) => void;
     onBlur?: () => void;
     placeholder?: string;
+    inputStyles?: any;
     inputProps?: Omit<TextInputProps, "value" | "onChangeText" | "onBlur">;
 };
 
@@ -17,6 +18,7 @@ export function InlineLabelInput({
                                      onChangeText,
                                      onBlur,
                                      placeholder,
+                                     inputStyles,
                                      inputProps,
                                  }: Props) {
     const isMultiline = !!inputProps?.multiline;
@@ -28,7 +30,7 @@ export function InlineLabelInput({
             <AppText style={styles.inlineLabel}>{label}</AppText>
 
             <TextInput
-                style={[styles.input, isMultiline && styles.textarea]}
+                style={[styles.input, isMultiline && styles.textarea, inputStyles]}
                 value={value}
                 onChangeText={onChangeText}
                 onBlur={onBlur}
