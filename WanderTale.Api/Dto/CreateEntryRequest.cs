@@ -1,4 +1,4 @@
 ﻿namespace WanderTale.Dto;
 
 
-public record CreateEntryRequest(DateTime? EntryDate, string Title, string Content);
+public abstract record CreateEntryRequest(DateTime? EntryDate, string Title, string Content);

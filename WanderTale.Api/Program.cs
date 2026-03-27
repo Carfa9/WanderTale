@@ -68,6 +68,9 @@ app.MapGet("/trips/{id:guid}", async (AppDbContext db, Guid id) =>
         .Include(t => t.TravelModes)
         .FirstOrDefaultAsync(t => t.Id == id);
 
+    if (trip == null)
+        return Results.NotFound();
+    
     return Results.Ok(new
     {
         trip.Id,
@@ -84,10 +87,6 @@ app.MapPost("/trips", async (AppDbContext db, CreateTripRequest request) =>
 {
     try
     {
-        Console.WriteLine("POST /trips hit");
-        Console.WriteLine(
-            $"TravelModes in request: {(request.TravelModes is null ? "null" : string.Join(",", request.TravelModes))}");
-
         var now = DateTime.UtcNow;
 
         var trip = new Trip
@@ -99,7 +98,7 @@ app.MapPost("/trips", async (AppDbContext db, CreateTripRequest request) =>
             EndDate = request.EndDate,
             CreatedAt = now,
             UpdatedAt = now,
-            TravelModes = (request.TravelModes ?? new())
+            TravelModes = (request.TravelModes)
                 .Select(m => new TripTravelMode { Mode = m })
                 .ToList()
         };
@@ -129,6 +128,8 @@ app.MapPost("/trips", async (AppDbContext db, CreateTripRequest request) =>
 });
 app.MapPost("/trips/{tripId:guid}/entries", async (AppDbContext db, Guid tripId, CreateEntryRequest req) =>
     {
+        var now = DateTime.UtcNow;
+        
         var entry = new Entry
         {
             Id = Guid.NewGuid(),
@@ -136,8 +137,8 @@ app.MapPost("/trips/{tripId:guid}/entries", async (AppDbContext db, Guid tripId,
             EntryDate = req.EntryDate,
             Title = req.Title,
             Content = req.Content,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            CreatedAt = now,
+            UpdatedAt = now
         };
 
         db.Entries.Add(entry);
@@ -146,5 +147,53 @@ app.MapPost("/trips/{tripId:guid}/entries", async (AppDbContext db, Guid tripId,
         return Results.Ok(entry);
     }
 );
+
+app.MapPost("/trips/{tripId:guid}/photos", async (AppDbContext db, Guid tripId, HttpRequest req, IWebHostEnvironment env) =>
+{
+    var form = await req.ReadFormAsync();
+    
+    var file = form.Files["image"];
+    var caption = form["caption"].ToString();
+    var entryIdValue = form["entryId"].ToString();
+    
+    if (file is null || file.Length == 0)
+        return Results.BadRequest("Ingen bild skickades");
+
+    Guid? entryId = null;
+    if (!string.IsNullOrWhiteSpace(entryIdValue) && Guid.TryParse(entryIdValue, out var parsedEntryId))
+    {
+        entryId = parsedEntryId;
+    }
+    
+    var uploadsFolder = Path.Combine(env.WebRootPath, "uploads");
+    Directory.CreateDirectory(uploadsFolder);
+    
+    var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+    var filePath = Path.Combine(uploadsFolder, fileName);
+    
+    await using (var stream = File.Create(filePath))
+    {
+        await file.CopyToAsync(stream);
+    }
+    
+    var now = DateTime.UtcNow;
+    
+    var photo = new Photo
+    {
+        Id = Guid.NewGuid(),
+        TripId = tripId,
+        EntryId = entryId,
+        ImageUri = $"/uploads/{fileName}",
+        Caption = string.IsNullOrWhiteSpace(caption) ? null : caption,
+        CreatedAt = now,
+        UpdatedAt = now
+    };
+
+    db.Photo.Add(photo);
+    await db.SaveChangesAsync();
+    
+    return Results.Ok(photo);
+
+});
 
 app.Run();

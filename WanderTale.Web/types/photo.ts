@@ -1,8 +1,8 @@
-﻿export type Photos = {
+﻿export type Photo = {
     id: string;
-    tripId: string;
-    imageUrl: string;
-    caption: string;
+    entryId: string;
+    imageUri: string;
+    caption?: string | null;
     createdAt: string;
     updatedAt: string;
 }

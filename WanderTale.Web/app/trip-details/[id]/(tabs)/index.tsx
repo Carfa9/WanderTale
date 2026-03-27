@@ -102,7 +102,8 @@ export default function TripDetails() {
                                            }>
                                     <AppText style={styles.addButtonText}>Lägg till anteckning</AppText>
                                 </Pressable>
-                                <Pressable style={[styles.addButton, styles.addButtonSecond]}>
+                                <Pressable style={[styles.addButton, styles.addButtonSecond]}
+                                onPress={() => router.push(`/trip-details/${tripId}/new-photo`)}>
                                     <AppText style={styles.addButtonText}>Lägg till foto</AppText>
                                 </Pressable>
                             </View>

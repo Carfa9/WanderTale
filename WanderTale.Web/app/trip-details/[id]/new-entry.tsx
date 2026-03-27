@@ -1,6 +1,6 @@
 ﻿import { ImageBackground, View, StyleSheet, ScrollView, Platform, KeyboardAvoidingView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { createEntry } from "@/api/entries";
 import { AppText } from "@/components/app-text";
 import NewEntryForm from "@/components/new-entry-form";
@@ -8,7 +8,6 @@ import { useLocalSearchParams, router } from "expo-router";
 import { CreateEntryDto } from "@/dto/createEntryDto";
 
 export default function NewEntry() {
-    const queryClient = useQueryClient();
     const { id } = useLocalSearchParams<{ id: string }>();
     const tripId = String(id);
     console.log("NewEntry route id:", id);

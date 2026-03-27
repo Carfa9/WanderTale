@@ -45,9 +45,9 @@ public class Photo
 {
     public Guid Id { get; set; }
     public Guid TripId { get; set; }
-    public Guid EntryId { get; set; }
+    public Guid? EntryId { get; set; }
 
-    public string ImageUrl { get; set; }
+    public string ImageUri { get; set; }
     public string? Caption { get; set; }
 
     public DateTime CreatedAt { get; set; }
