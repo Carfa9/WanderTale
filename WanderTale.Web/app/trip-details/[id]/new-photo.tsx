@@ -1,8 +1,7 @@
-﻿import {useLocalSearchParams} from "expo-router";
+﻿import {router, useLocalSearchParams} from "expo-router";
 import PickImage from "@/components/image-picker";
 import {
     Alert,
-    Button,
     ImageBackground,
     KeyboardAvoidingView,
     Platform, Pressable,
@@ -13,7 +12,7 @@ import {
 import {AppText} from "@/components/app-text";
 import {SafeAreaView} from "react-native-safe-area-context";
 import React, {useState} from "react";
-import {useMutation} from "@tanstack/react-query";
+import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {createPhoto} from "@/api/photo";
 import DateInput from "@/components/date-input";
 import {InlineLabelInput} from "@/components/inline-label-input";
@@ -31,47 +30,61 @@ export default function NewPhoto({ onSubmit, isSaving = false, errorMessage,}: P
     const tripId = String(id);
     console.log("NewPhoto route id:", id);
 
-    const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+    const [selectedImageUris, setSelectedImageUris] = useState<string[]>([]);
     const [photoDate, setPhotoDate] = useState<Date | null>(null);
     const [caption, setCaption] = useState("");
     const [entryId, setEntryId] = useState<string | null>(null);
+    const queryClient = useQueryClient();
 
     const createPhotoMutation = useMutation({
         mutationFn: (formData: FormData) => createPhoto(tripId, formData),
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
+            await queryClient.invalidateQueries({queryKey: ["trip", tripId]});
             console.log("CREATE SUCCESS:", data);
-            Alert.alert("Sparad", "Bilden har sparats.");
         },
         onError: (err) => {
-            console.log("CREATE ERROR:", err);
+            console.log("CREATE ERROR full:", JSON.stringify(err, null, 2));
+            console.log("CREATE ERROR raw:", err);
             Alert.alert("Fel", "Kunde inte spara bilden.");
         },
     });
 
-    const handleSavePhoto = () => {
-        if (!selectedImageUri) {
+    const handleSavePhoto = async () => {
+        if (selectedImageUris.length === 0) {
             Alert.alert("Ingen bild vald", "Välj en bild först.");
             return;
         }
 
-        const formData = new FormData();
-        formData.append("caption", caption);
+        try {
+            for (const uri of selectedImageUris) {
+                const formData = new FormData();
+                formData.append("caption", caption);
 
-        if (photoDate) {
-            formData.append("photoDate", photoDate.toISOString());
+                if (photoDate) {
+                    formData.append("photoDate", photoDate.toISOString());
+                }
+
+                if (entryId) {
+                    formData.append("entryId", entryId);
+                }
+
+                const fileName = uri.split("/").pop() ?? "photo.jpg";
+
+                formData.append("image", {
+                    uri,
+                    name: fileName,
+                    type: "image/jpeg",
+                } as any);
+
+                console.log("Uploading image:", uri);
+
+                await createPhotoMutation.mutateAsync(formData);
+            }
+            router.replace(`/trip-details/${tripId}/memories`);
+        } catch (error) {
+            console.log("SAVE ERROR:", error);
+            Alert.alert("Fel", "Kunde inte spara bilden.");
         }
-
-        if (entryId) {
-            formData.append("entryId", entryId);
-        }
-
-        formData.append("image", {
-            uri: selectedImageUri,
-            name: "photo.jpg",
-            type: "image/jpeg",
-        } as any);
-
-        createPhotoMutation.mutate(formData);
     };
 
     return (
@@ -102,7 +115,7 @@ export default function NewPhoto({ onSubmit, isSaving = false, errorMessage,}: P
                                 />
                             </View>
 
-                            <PickImage onImageSelected={setSelectedImageUri} />
+                            <PickImage onImageSelected={setSelectedImageUris} />
 
                                 <Pressable
                                     style={styles.submitButton}

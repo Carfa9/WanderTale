@@ -6,6 +6,9 @@ import {getTripById} from "@/api/trips";
 import {SafeAreaView} from "react-native-safe-area-context";
 import {AppText} from "@/components/app-text";
 import MemoryCarousel from "@/components/image-carousel";
+import {api_url} from "@/api/config";
+import {getPhotos} from "@/api/photo";
+
 
 export default function MemoriesScreen() {
     const {id} = useLocalSearchParams<{ id: string | string[] }>();
@@ -16,16 +19,18 @@ export default function MemoriesScreen() {
         queryFn: () => getTripById(String(tripId)),
         enabled: !!tripId,
     });
+    console.log("tripId in MemoriesScreen:", tripId);
+    const {data: photos = []} = useQuery({
+        queryKey: ["photos", tripId],
+        queryFn: () => getPhotos(tripId),
+        enabled: !!tripId,
+    });
 
-    type Props = {
-        images: any[];
-    };
+    const images = photos.map((photo) => `${api_url}${photo.imageUri}`);
 
-    const images = [
-        require("@/assets/images/bike.png"),
-        require("@/assets/images/train.png"),
-        require("@/assets/images/Plane.png"),
-    ];   
+
+    console.log("photos:", photos);
+    console.log("images:", images);
 
     return (
         <SafeAreaView style={styles.screen}>
@@ -38,24 +43,27 @@ export default function MemoriesScreen() {
             </View>
 
             <View style={styles.bottom}>
-                <TripSectionTabs tripId={tripId}/>
-                <View style={styles.paperStack}>
-                    <ImageBackground
-                        source={require("@/assets/images/TheWorld.png")}
-                        style={styles.paper}
-                        imageStyle={styles.paperImg}
-                    >
 
-                        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}
-                                    overScrollMode="never"
-                                    contentContainerStyle={styles.scrollContent}>
-                            <MemoryCarousel
-                                images={images}
-                            />
-                           
-                        </ScrollView>
-                    </ImageBackground>
-                </View>
+                <ImageBackground
+                    source={require("@/assets/images/TheWorld.png")}
+                    imageStyle={styles.paperImg}
+                    style={{flex: 1}}
+                >
+                    <View style={styles.tabsWrapper}>
+                        <TripSectionTabs tripId={tripId}/>
+                    </View>
+
+                    <ScrollView style={styles.content}
+                                showsVerticalScrollIndicator={false}
+                                overScrollMode="never"
+                                contentContainerStyle={styles.scrollContent}>
+                        <View style={{width: "100%", maxWidth: 340, alignSelf: "center"}}>
+                            <MemoryCarousel images={images}/>
+                        </View>
+
+                    </ScrollView>
+                </ImageBackground>
+
             </View>
         </SafeAreaView>
     );
@@ -84,28 +92,19 @@ const styles = StyleSheet.create({
 
     bottom: {
         flex: 7,
-        alignItems: "center",
-        paddingHorizontal: 30,
+        alignItems: "stretch",
     },
 
-    tabs: {
+    tabsWrapper: {
         alignItems: "center",
-    },
-
-    paperStack: {
+        position: "absolute",
+        top: 0,
         width: "100%",
-        alignItems: "center",
-        position: "relative",
-        marginTop: 15,
-    },
-
-    paper: {
-        width: "100%",
-        alignItems: "center",
+        zIndex: 10,
     },
 
     paperImg: {
-        resizeMode: "cover",
+        opacity: 0.6,
     },
 
     fieldValue: {
@@ -115,11 +114,16 @@ const styles = StyleSheet.create({
 
     content: {
         width: "100%",
-        maxWidth: 250,
+        marginTop: 60,
+    },
+
+    carouselContent: {
+        width: "100%",
+        maxWidth: 340,
+        alignSelf: "center",
         paddingHorizontal: 0,
         paddingVertical: 20,
         borderRadius: 18,
-        paddingBottom: 30,
     },
 
     buttonContainer: {
@@ -146,18 +150,6 @@ const styles = StyleSheet.create({
     addButtonText: {
         fontSize: 20,
         paddingHorizontal: 30,
-    },
-
-    modeRow: {
-        flexDirection: "row",
-        gap: 8,
-        alignItems: "center",
-        justifyContent: "flex-end",
-    },
-
-    modeIcon: {
-        width: 26,
-        height: 26,
     },
 
     scrollContent: {

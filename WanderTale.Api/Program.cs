@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi; // för OpenApiInfo
+using Microsoft.OpenApi;
 using WanderTale;
-using WanderTale.Dto; // där AppDbContext ligger
-using WanderTale.Models; // där Trip ligger
+using WanderTale.Dto;
+using WanderTale.Models;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -56,11 +57,15 @@ using (var scope = app.Services.CreateScope())
 
 app.UseCors("AllowFrontend");
 
+app.UseStaticFiles();
+
 app.UseSwagger();
 app.UseSwaggerUI(c => { c.SwaggerEndpoint("/swagger/v1/swagger.json", "WanderTale API v1"); });
 
 app.MapGet("/trips", async (AppDbContext db) =>
     await db.Trips.ToListAsync());
+
+
 
 app.MapGet("/trips/{id:guid}", async (AppDbContext db, Guid id) =>
 {
@@ -81,6 +86,25 @@ app.MapGet("/trips/{id:guid}", async (AppDbContext db, Guid id) =>
         trip.Description,
         TravelModes = trip.TravelModes.Select(x => x.Mode).ToList()
     });
+});
+
+app.MapGet("/trips/{tripId:guid}/photos", async (AppDbContext db, Guid tripId) =>
+{
+    var photos = await db.Photo
+        .Where(p => p.TripId == tripId)
+        .OrderByDescending(p => p.CreatedAt)
+        .Select(p => new
+        {
+            p.Id,
+            p.TripId,
+            p.EntryId,
+            p.ImageUri,
+            p.Caption,
+            p.CreatedAt,
+            p.UpdatedAt
+        }).ToListAsync();
+
+    return Results.Ok(photos);
 });
 
 app.MapPost("/trips", async (AppDbContext db, CreateTripRequest request) =>
@@ -156,6 +180,12 @@ app.MapPost("/trips/{tripId:guid}/photos", async (AppDbContext db, Guid tripId, 
     var caption = form["caption"].ToString();
     var entryIdValue = form["entryId"].ToString();
     
+    Console.WriteLine($"WebRootPath: {env.WebRootPath}");
+    Console.WriteLine($"ContentRootPath: {env.ContentRootPath}");
+    Console.WriteLine($"File null? {file is null}");
+    Console.WriteLine($"File length: {file?.Length}");
+    Console.WriteLine($"File name: {file?.FileName}");
+    
     if (file is null || file.Length == 0)
         return Results.BadRequest("Ingen bild skickades");
 
@@ -165,7 +195,10 @@ app.MapPost("/trips/{tripId:guid}/photos", async (AppDbContext db, Guid tripId, 
         entryId = parsedEntryId;
     }
     
-    var uploadsFolder = Path.Combine(env.WebRootPath, "uploads");
+    var root = string.IsNullOrWhiteSpace(env.WebRootPath)
+        ? Path.Combine(env.ContentRootPath, "wwwroot")
+        : env.WebRootPath;
+    var uploadsFolder = Path.Combine(root, "uploads");
     Directory.CreateDirectory(uploadsFolder);
     
     var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";

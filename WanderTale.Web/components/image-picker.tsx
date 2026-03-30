@@ -1,42 +1,60 @@
 ﻿import { useState } from 'react';
-import { Alert, Button, Image, View, StyleSheet } from 'react-native';
+import { Alert, Button, Image, View, StyleSheet, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 type PickImageProps = {
-    onImageSelected?: (uri: string) => void;
-}
+    onImageSelected?: (uris: string[]) => void;
+};
 
 export default function PickImage({ onImageSelected }: PickImageProps) {
-    const [image, setImage] = useState<string | null>(null);
+    const [images, setImages] = useState<string[]>([]);
 
     const pickImage = async () => {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        console.log('permissionResult:', permissionResult);
 
         if (!permissionResult.granted) {
-            Alert.alert('Tillåtelse krävs', 'Tillåtelse för tillträdelse i bildbibliotek krävs.');
+            if (!permissionResult.canAskAgain) {
+                Alert.alert(
+                    'Tillåtelse saknas',
+                    'Appen har inte tillgång till bildbiblioteket. Gå till inställningar och tillåt åtkomst.',
+                    [
+                        { text: 'Avbryt', style: 'cancel' },
+                        { text: 'Öppna inställningar', onPress: () => Linking.openSettings() }
+                    ]
+                );
+            } else {
+                Alert.alert(
+                    'Tillåtelse krävs',
+                    'Du behöver ge appen tillgång till bildbiblioteket för att välja en bild.'
+                );
+            }
             return;
         }
 
-        let result = await ImagePicker.launchImageLibraryAsync({
+        const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
-            allowsEditing: true,
-            aspect: [4, 3],
+            allowsMultipleSelection: true,
             quality: 1,
         });
 
-        console.log(result);
+        console.log('picker result:', result);
 
         if (!result.canceled) {
-            const selectedUri = result.assets[0].uri;
-            setImage(selectedUri);
-            onImageSelected?.(selectedUri);
+            const selectedUris = result.assets.map(asset => asset.uri);
+            setImages(selectedUris);
+            onImageSelected?.(selectedUris);
         }
     };
 
     return (
         <View style={styles.container}>
-            <Button title="Välj en bild." onPress={pickImage} />
-            {image && <Image source={{ uri: image }} style={styles.image} />}
+            <Button title="Välj en bild" onPress={pickImage} />
+            <View style={styles.previewContainer}>
+                {images.map((uri) => (
+                    <Image key={uri} source={{ uri }} style={styles.image} />
+                ))}
+            </View>
         </View>
     );
 }
@@ -45,6 +63,13 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         alignItems: 'center',
+        justifyContent: 'center',
+    },
+    previewContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 12,
         justifyContent: 'center',
     },
     image: {
