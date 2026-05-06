@@ -49,6 +49,8 @@ public class Photo
 
     public string ImageUri { get; set; }
     public string? Caption { get; set; }
+    public DateTime? PhotoDate { get; set; }
+    public string? Location { get; set; }
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

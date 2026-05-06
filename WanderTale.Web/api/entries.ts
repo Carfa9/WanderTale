@@ -2,6 +2,12 @@
 import {CreateEntryDto} from "@/dto/createEntryDto";
 import {api_url} from "@/api/config";
 
+export async function getEntries(tripId: string): Promise<Entry[]> {
+    const response = await fetch(`${api_url}/trips/${tripId}/entries`);
+    const text = await response.text();
+    if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+    return text ? JSON.parse(text) : [];
+}
 
 export async function createEntry(tripId: string, dto: CreateEntryDto): Promise<Entry> {
     const url = `${api_url}/trips/${tripId}/entries`;

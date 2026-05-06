@@ -19,6 +19,20 @@ export async function createPhoto(tripId: string, formData: FormData): Promise<P
     return text ? JSON.parse(text) : (null as any);
 }
 
+export async function deletePhoto(photoId: string): Promise<void> {
+    const response = await fetch(`${api_url}/photos/${photoId}`, { method: "DELETE" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+}
+
+export async function updatePhotoCaption(photoId: string, caption: string | null): Promise<void> {
+    const response = await fetch(`${api_url}/photos/${photoId}/caption`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caption }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+}
+
 export async function getPhotos(tripId: string): Promise<Photo[]> {
     const url = `${api_url}/trips/${tripId}/photos`;
     console.log("GET PHOTOS url:", url);

@@ -102,6 +102,12 @@ namespace WanderTale.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Location")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("PhotoDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("TripId")
                         .HasColumnType("TEXT");
 

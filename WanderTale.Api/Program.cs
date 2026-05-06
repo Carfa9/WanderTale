@@ -100,6 +100,8 @@ app.MapGet("/trips/{tripId:guid}/photos", async (AppDbContext db, Guid tripId) =
             p.EntryId,
             p.ImageUri,
             p.Caption,
+            p.PhotoDate,
+            p.Location,
             p.CreatedAt,
             p.UpdatedAt
         }).ToListAsync();
@@ -150,6 +152,43 @@ app.MapPost("/trips", async (AppDbContext db, CreateTripRequest request) =>
         return Results.Problem(ex.ToString());
     }
 });
+app.MapGet("/trips/{tripId:guid}/entries", async (AppDbContext db, Guid tripId) =>
+{
+    var entries = await db.Entries
+        .Where(e => e.TripId == tripId)
+        .OrderByDescending(e => e.EntryDate)
+        .Select(e => new { e.Id, e.Title, e.EntryDate, e.Content })
+        .ToListAsync();
+    return Results.Ok(entries);
+});
+
+app.MapDelete("/photos/{photoId:guid}", async (AppDbContext db, Guid photoId, IWebHostEnvironment env) =>
+{
+    var photo = await db.Photo.FindAsync(photoId);
+    if (photo is null) return Results.NotFound();
+
+    var root = string.IsNullOrWhiteSpace(env.WebRootPath)
+        ? Path.Combine(env.ContentRootPath, "wwwroot")
+        : env.WebRootPath;
+    var filePath = Path.Combine(root, photo.ImageUri.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+    if (File.Exists(filePath)) File.Delete(filePath);
+
+    db.Photo.Remove(photo);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+});
+
+app.MapPatch("/photos/{photoId:guid}/caption", async (AppDbContext db, Guid photoId, UpdateCaptionRequest req) =>
+{
+    var photo = await db.Photo.FindAsync(photoId);
+    if (photo is null) return Results.NotFound();
+
+    photo.Caption = string.IsNullOrWhiteSpace(req.Caption) ? null : req.Caption.Trim();
+    photo.UpdatedAt = DateTime.UtcNow;
+    await db.SaveChangesAsync();
+    return Results.Ok(new { photo.Id, photo.Caption });
+});
+
 app.MapPost("/trips/{tripId:guid}/entries", async (AppDbContext db, Guid tripId, CreateEntryRequest req) =>
     {
         var now = DateTime.UtcNow;
@@ -178,6 +217,8 @@ app.MapPost("/trips/{tripId:guid}/photos", async (AppDbContext db, Guid tripId, 
     
     var file = form.Files["image"];
     var caption = form["caption"].ToString();
+    var photoDateValue = form["photoDate"].ToString();
+    var location = form["location"].ToString();
     var entryIdValue = form["entryId"].ToString();
     
     Console.WriteLine($"WebRootPath: {env.WebRootPath}");
@@ -193,6 +234,12 @@ app.MapPost("/trips/{tripId:guid}/photos", async (AppDbContext db, Guid tripId, 
     if (!string.IsNullOrWhiteSpace(entryIdValue) && Guid.TryParse(entryIdValue, out var parsedEntryId))
     {
         entryId = parsedEntryId;
+    }
+
+    DateTime? photoDate = null;
+    if (!string.IsNullOrWhiteSpace(photoDateValue) && DateTime.TryParse(photoDateValue, out var parsedPhotoDate))
+    {
+        photoDate = parsedPhotoDate;
     }
     
     var root = string.IsNullOrWhiteSpace(env.WebRootPath)
@@ -218,6 +265,8 @@ app.MapPost("/trips/{tripId:guid}/photos", async (AppDbContext db, Guid tripId, 
         EntryId = entryId,
         ImageUri = $"/uploads/{fileName}",
         Caption = string.IsNullOrWhiteSpace(caption) ? null : caption,
+        PhotoDate = photoDate,
+        Location = string.IsNullOrWhiteSpace(location) ? null : location.Trim(),
         CreatedAt = now,
         UpdatedAt = now
     };
