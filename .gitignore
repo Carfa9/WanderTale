@@ -78,3 +78,6 @@ yarn-error.log*
 
 # Maps
 *.map
+
+# Uploaded photos
+WanderTale.Api/wwwroot/uploads/
