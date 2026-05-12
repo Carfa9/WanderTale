@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import {
     Alert,
     Dimensions,
     FlatList,
+    Keyboard,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -21,6 +23,7 @@ import { deletePhoto, getPhotos, updatePhotoCaption } from "@/api/photo";
 import { Photo } from "@/types/photo";
 import { api_url } from "@/api/config";
 import { FormatDate } from "@/components/format-date";
+import {useTheme} from "@/context/ThemeContext";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -34,6 +37,8 @@ const CELL_HEIGHT = CELL_SIZE + THUMB_PAD + THUMB_BOTTOM;
 
 
 export default function AlbumScreen() {
+    const {theme} = useTheme();
+    const styles = createStyles(theme.tokens);
     const { id, initialIndex } = useLocalSearchParams<{ id: string; initialIndex?: string }>();
     const tripId = String(id);
     const queryClient = useQueryClient();
@@ -42,6 +47,7 @@ export default function AlbumScreen() {
     const [overlayIndex, setOverlayIndex] = useState(0);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [captions, setCaptions] = useState<Record<string, string>>({});
+    const [isEditingCaption, setIsEditingCaption] = useState(false);
 
     const { data: trip } = useQuery({
         queryKey: ["trip", tripId],
@@ -66,9 +72,13 @@ export default function AlbumScreen() {
 
     const currentPhoto = photos[overlayIndex] ?? null;
 
+    const currentCaption =
+        currentPhoto ? captions[currentPhoto.id] ?? currentPhoto.caption ?? "" : "";
+
     const openOverlay = (index: number) => {
         setOverlayIndex(index);
         setEnlargedIndex(index);
+        setIsEditingCaption(false);
     };
 
     const saveCaption = async (photo: Photo) => {
@@ -92,6 +102,7 @@ export default function AlbumScreen() {
             await saveCaption(currentPhoto);
         }
         setEnlargedIndex(null);
+        setIsEditingCaption(false);
     };
 
     const goToPhoto = async (index: number) => {
@@ -99,6 +110,7 @@ export default function AlbumScreen() {
             await saveCaption(currentPhoto);
         }
         setOverlayIndex(index);
+        setIsEditingCaption(false);
     };
 
     const toggleSelect = (photoId: string) => {
@@ -160,10 +172,14 @@ export default function AlbumScreen() {
             ]
         );
     };
-
-    const handleCaptionBlur = (photo: Photo) => {
-        void saveCaption(photo);
-    };
+    
+    function toggleEditing() {
+        if (isEditingCaption) {
+            Keyboard.dismiss();
+        }
+        
+        setIsEditingCaption((prev) => !prev);
+    }
 
     return (
         <SafeAreaView style={styles.screen}>
@@ -248,7 +264,7 @@ export default function AlbumScreen() {
                     >
                         <View style={styles.innerCard}>
                             <Pressable style={styles.closeBtn} onPress={closeOverlay}>
-                                <AppText style={styles.closeBtnText}>✕</AppText>
+                                <Ionicons name="close" size={18} color={theme.tokens.textPrimary}/>
                             </Pressable>
 
                             {currentPhoto && (
@@ -260,45 +276,72 @@ export default function AlbumScreen() {
                                             contentFit="cover"
                                         />
                                     </View>
-
-                                    {(currentPhoto.photoDate || currentPhoto.location) && (
+                                    
                                         <View style={styles.metaBox}>
                                             {currentPhoto.photoDate && (
                                                 <View style={styles.metaRow}>
-                                                    <AppText style={styles.metaLabel}>Datum:</AppText>
+                                                    <AppText style={styles.metaLabel}>När:</AppText>
                                                     <AppText style={styles.metaValue}>{FormatDate(currentPhoto.photoDate)}</AppText>
                                                 </View>
                                             )}
                                             {currentPhoto.location && (
                                                 <View style={styles.metaRow}>
-                                                    <AppText style={styles.metaLabel}>Plats:</AppText>
+                                                    <AppText style={styles.metaLabel}>Var:</AppText>
                                                     <AppText style={styles.metaValue}>{currentPhoto.location}</AppText>
                                                 </View>
                                             )}
+                                           
+                                                <View style={styles.metaRow}>
+                                                    <AppText style={styles.metaLabel}>Minne:</AppText>
+                                                    <AppText style={styles.metaValue}>
+                                                        {currentCaption || "Inget minne ännu"}
+                                                    </AppText>
+
+                                                    <Pressable onPress={toggleEditing}>
+                                                        <Ionicons
+                                                            name={isEditingCaption ? "close-outline" : currentCaption ? "create-outline" : "add-circle-outline"}
+                                                            size={22}
+                                                            color={theme.tokens.textSecondary}
+                                                        />
+                                                    </Pressable>
+                                                </View>
+                                        </View>
+
+                                    {isEditingCaption && (
+                                        <View style={styles.captionEditor}>
+                                            <TextInput
+                                                style={styles.captionInput}
+                                                value={currentCaption}
+                                                onChangeText={(text) => {
+                                                    if (!currentPhoto) return;
+
+                                                    setCaptions((prev) => ({
+                                                        ...prev,
+                                                        [currentPhoto.id]: text,
+                                                    }));
+                                                }}
+                                                placeholder="Skriv ett minne..."
+                                                multiline
+                                            />
+
+                                            <Pressable
+                                                style={[
+                                                    styles.saveCaptionBtn,
+                                                    captionMutation.isPending && styles.saveCaptionBtnDisabled,
+                                                ]}
+                                                disabled={captionMutation.isPending}
+                                                onPress={async () => {
+                                                    await saveCaption(currentPhoto);
+                                                    Keyboard.dismiss();
+                                                    setIsEditingCaption(false);
+                                                }}
+                                                >
+                                                <AppText style={styles.saveCaptionText}>
+                                                    {captionMutation.isPending ? "Sparar..." : "Spara"}
+                                                </AppText>
+                                            </Pressable>
                                         </View>
                                     )}
-
-                                    <TextInput
-                                        style={styles.captionInput}
-                                        placeholder="Skriv en bildtext..."
-                                        placeholderTextColor="rgba(0,0,0,0.35)"
-                                        value={captions[currentPhoto.id] ?? currentPhoto.caption ?? ""}
-                                        onChangeText={(text) =>
-                                            setCaptions((prev) => ({ ...prev, [currentPhoto.id]: text }))
-                                        }
-                                        onEndEditing={() => handleCaptionBlur(currentPhoto)}
-                                        multiline
-                                    />
-
-                                    <Pressable
-                                        style={[styles.saveCaptionBtn, captionMutation.isPending && styles.saveCaptionBtnDisabled]}
-                                        disabled={captionMutation.isPending}
-                                        onPress={() => saveCaption(currentPhoto)}
-                                    >
-                                        <AppText style={styles.saveCaptionText}>
-                                            {captionMutation.isPending ? "Sparar..." : "Spara bildtext"}
-                                        </AppText>
-                                    </Pressable>
 
                                     <View style={styles.navRow}>
                                         <Pressable
@@ -342,8 +385,8 @@ export default function AlbumScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: "#F5EDE4" },
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: theme.background },
 
     header: {
         flexDirection: "row",
@@ -351,7 +394,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 10,
         borderBottomWidth: 1,
-        borderBottomColor: "rgba(0,0,0,0.1)",
+        borderBottomColor: theme.borderLight,
     },
     backButton: { marginRight: 12 },
     backText: { fontSize: 18 },
@@ -373,12 +416,12 @@ const styles = StyleSheet.create({
     thumbPolaroid: {
         width: CELL_SIZE,
         height: CELL_HEIGHT,
-        backgroundColor: "#fff",
+        backgroundColor: theme.surface,
         paddingTop: THUMB_PAD,
         paddingHorizontal: THUMB_PAD,
         paddingBottom: THUMB_BOTTOM,
         borderRadius: 3,
-        shadowColor: "#000",
+        shadowColor: theme.shadow,
         shadowOpacity: 0.14,
         shadowRadius: 4,
         shadowOffset: { width: 0, height: 2 },
@@ -397,43 +440,43 @@ const styles = StyleSheet.create({
         height: 20,
         borderRadius: 10,
         borderWidth: 1.5,
-        borderColor: "rgba(0,0,0,0.3)",
-        backgroundColor: "rgba(255,255,255,0.7)",
+        borderColor: theme.border,
+        backgroundColor: theme.surface,
         alignItems: "center",
         justifyContent: "center",
     },
     checkboxSelected: {
-        backgroundColor: "#D5F7F4",
-        borderColor: "#5bc8bf",
+        backgroundColor: theme.accentSoft,
+        borderColor: theme.accent,
     },
-    checkmark: { fontSize: 12, lineHeight: 14, color: "#1a8f87" },
+    checkmark: { fontSize: 12, lineHeight: 14, color: theme.accentDark },
 
-    empty: { textAlign: "center", marginTop: 60, color: "rgba(0,0,0,0.4)", alignSelf: "center" },
+    empty: { textAlign: "center", marginTop: 60, color: theme.textMuted, alignSelf: "center" },
 
     stickyBar: {
         position: "absolute",
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: "#F5EDE4",
+        backgroundColor: theme.background,
         borderTopWidth: 1,
-        borderTopColor: "rgba(0,0,0,0.1)",
+        borderTopColor: theme.borderLight,
         padding: 16,
     },
     deleteAllBtn: {
-        backgroundColor: "#fde8e8",
+        backgroundColor: theme.surfaceAlt,
         borderRadius: 12,
         paddingVertical: 14,
         alignItems: "center",
         borderWidth: 1,
-        borderColor: "rgba(200,0,0,0.15)",
+        borderColor: theme.error,
     },
-    deleteAllText: { fontSize: 17, color: "#c0392b" },
+    deleteAllText: { fontSize: 17, color: theme.error },
 
     backdrop: {
         position: "absolute",
         top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.62)",
+        backgroundColor: theme.shadow,
     },
     overlayContainer: {
         position: "absolute",
@@ -448,12 +491,14 @@ const styles = StyleSheet.create({
     },
     innerCard: {
         width: "100%",
-        maxWidth: 340,
-        backgroundColor: "#F5EDE4",
-        borderRadius: 14,
-        padding: 20,
-        gap: 14,
-        shadowColor: "#000",
+        maxWidth: 350,
+        backgroundColor: theme.surface,
+        borderRadius: 16,
+        padding: 18,
+        gap: 12,
+        borderWidth: 1,
+        borderColor: theme.borderLight,
+        shadowColor: theme.shadow,
         shadowOpacity: 0.35,
         shadowRadius: 18,
         shadowOffset: { width: 0, height: 8 },
@@ -463,110 +508,125 @@ const styles = StyleSheet.create({
     },
     closeBtn: {
         position: "absolute",
-        top: -12,
-        right: -12,
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: "#fff",
+        top: -11,
+        right: -11,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: theme.surface,
         alignItems: "center",
         justifyContent: "center",
-        shadowColor: "#000",
+        shadowColor: theme.shadow,
         shadowOpacity: 0.2,
         shadowRadius: 4,
         elevation: 4,
         zIndex: 10,
     },
-    closeBtnText: { fontSize: 14, color: "#333", lineHeight: 16 },
-
     overlayPolaroid: {
         width: "100%",
         aspectRatio: 1,
-        backgroundColor: "#fff",
+        backgroundColor: theme.surface,
         padding: 10,
         paddingBottom: 36,
         borderRadius: 4,
-        shadowColor: "#000",
-        shadowOpacity: 0.12,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 3 },
+        shadowColor: theme.shadow,
+        shadowOpacity: 0.14,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
         elevation: 4,
     },
     overlayPhoto: { flex: 1, borderRadius: 2 },
 
+    captionEditor: {
+        gap: 8,
+        marginTop: -4,
+        paddingTop: 4,
+    },
+
     captionInput: {
         borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.15)",
+        borderColor: theme.borderLight,
         borderRadius: 10,
-        padding: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
         fontSize: 16,
         fontFamily: "IndieFlower",
-        color: "#333",
-        minHeight: 60,
+        color: theme.textPrimary,
+        minHeight: 52,
+        maxHeight: 90,
         textAlignVertical: "top",
-        backgroundColor: "rgba(255,255,255,0.6)",
+        backgroundColor: theme.surface,
     },
+    
     metaBox: {
-        gap: 6,
-        paddingVertical: 2,
+        gap: 7,
+        paddingVertical: 4,
+        paddingHorizontal: 2,
     },
     metaRow: {
         flexDirection: "row",
         gap: 8,
         alignItems: "center",
+        minHeight: 28,
     },
     metaLabel: {
         fontSize: 15,
-        color: "rgba(0,0,0,0.5)",
+        color: theme.textSecondary,
     },
     metaValue: {
         flex: 1,
         fontSize: 16,
-        color: "#333",
+        color: theme.textPrimary,
     },
     saveCaptionBtn: {
         alignSelf: "flex-end",
         paddingVertical: 8,
         paddingHorizontal: 14,
         borderRadius: 10,
-        backgroundColor: "#D5F7F4",
+        backgroundColor: theme.accentSoft,
         borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.08)",
+        borderColor: theme.borderLight,
     },
     saveCaptionBtnDisabled: {
         opacity: 0.55,
     },
     saveCaptionText: {
         fontSize: 15,
-        color: "#1f5f5a",
+        color: theme.accentDark,
     },
 
     navRow: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
+        paddingTop: 2,
     },
-    navArrow: { padding: 8 },
-    navArrowText: { fontSize: 34, color: "#333", lineHeight: 38 },
-    navArrowDisabled: { color: "rgba(0,0,0,0.2)" },
-    counter: { fontSize: 15, color: "rgba(0,0,0,0.5)" },
+    navArrow: {
+        width: 44,
+        height: 38,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    navArrowText: { fontSize: 34, color: theme.textPrimary, lineHeight: 38 },
+    navArrowDisabled: { color: theme.textMuted },
+    counter: { fontSize: 15, color: theme.textMuted },
 
     deleteBtn: {
         alignSelf: "center",
         paddingVertical: 10,
         paddingHorizontal: 24,
         borderRadius: 10,
-        backgroundColor: "#fde8e8",
+        backgroundColor: theme.surfaceAlt,
         borderWidth: 1,
-        borderColor: "rgba(200,0,0,0.15)",
+        borderColor: theme.error,
     },
-    deleteBtnText: { fontSize: 16, color: "#c0392b" },
+    deleteBtnText: { fontSize: 16, color: theme.error },
 
     addCell: {
         alignItems: "center",
         justifyContent: "center",
         gap: 4,
     },
-    addPlus: { fontSize: 28, color: "rgba(0,0,0,0.3)", lineHeight: 32 },
-    addLabel: { fontSize: 11, color: "rgba(0,0,0,0.4)", textAlign: "center" },
+    addPlus: { fontSize: 28, color: theme.textMuted, lineHeight: 32 },
+    addLabel: { fontSize: 11, color: theme.textMuted, textAlign: "center" },
 });
