@@ -11,8 +11,11 @@ import { getPhotos } from "@/api/photo";
 import { getEntries } from "@/api/entries";
 import { Entry } from "@/types/entry";
 import { FormatDate } from "@/components/format-date";
+import {useTheme} from "@/context/ThemeContext";
 
 export default function MemoriesScreen() {
+    const {theme} = useTheme();
+    const styles = createStyles(theme.tokens);
     const { id } = useLocalSearchParams<{ id: string | string[] }>();
     const tripId = Array.isArray(id) ? id[0] : id;
 
@@ -88,16 +91,17 @@ export default function MemoriesScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: "#F5EDE4" },
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: theme.background },
     top: {
         flexDirection: "row",
         alignItems: "flex-end",
         justifyContent: "center",
-        paddingTop: 10,
-        paddingBottom: 10,
-        borderBottomWidth: 15,
-        borderBottomColor: "#C0C0C0",
+        paddingTop: 12,
+        paddingBottom: 12,
+        paddingHorizontal: 52,
+        borderBottomWidth: 10,
+        borderBottomColor: theme.border,
     },
     bottom: { flex: 7, alignItems: "stretch" },
     tabsWrapper: {
@@ -107,22 +111,27 @@ const styles = StyleSheet.create({
         width: "100%",
         zIndex: 10,
     },
-    paperImg: { opacity: 0.6 },
+    paperImg: { opacity: 0.42 },
     content: { width: "100%", marginTop: 60 },
     scrollContent: { paddingBottom: 40, paddingTop: 6 },
     entriesSection: {
-        marginTop: 28,
+        marginTop: 26,
         paddingHorizontal: 24,
-        gap: 8,
+        gap: 10,
     },
-    entriesHeading: { marginBottom: 8 },
+    entriesHeading: {
+        marginBottom: 2,
+        color: theme.textPrimary,
+    },
     entryRow: {
-        backgroundColor: "rgba(255,255,255,0.55)",
-        borderRadius: 10,
+        backgroundColor: theme.surface,
+        borderRadius: 9,
         paddingVertical: 12,
         paddingHorizontal: 16,
         gap: 2,
+        borderWidth: 1,
+        borderColor: theme.borderLight,
     },
-    entryDate: { fontSize: 13, color: "rgba(0,0,0,0.45)" },
+    entryDate: { fontSize: 13, color: theme.textMuted },
     entryTitle: { fontSize: 17 },
 });

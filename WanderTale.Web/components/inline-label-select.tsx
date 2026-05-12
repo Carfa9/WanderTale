@@ -1,11 +1,11 @@
-﻿import {Pressable, View, StyleSheet} from "react-native";
-import {AppText} from "@/components/app-text";
+import React from "react";
+import {Pressable, StyleSheet, View} from "react-native";
 import {Ionicons} from "@expo/vector-icons";
 import {Image} from "expo-image";
-import React from "react";
-import {TravelModeKey} from "@/types/travelMode";
+import {AppText} from "@/components/app-text";
 import {transportOptionList} from "@/components/transport-options";
-
+import {TravelModeKey} from "@/types/travelMode";
+import {useTheme} from "@/context/ThemeContext";
 
 type Props = {
     label: string;
@@ -14,7 +14,10 @@ type Props = {
     onPress: () => void;
 };
 
-export function InlineLabelSelect({label, value = [], placeholder, onPress}: Props) {
+export function InlineLabelSelect({label, value = [], onPress}: Props) {
+    const {theme} = useTheme();
+    const styles = createStyles(theme.tokens);
+
     return (
         <Pressable onPress={onPress}>
             <View style={styles.wrapper}>
@@ -40,21 +43,21 @@ export function InlineLabelSelect({label, value = [], placeholder, onPress}: Pro
                         </View>
                     )}
                 </View>
-                <Ionicons name="chevron-down" size={18} color="#9aa0a6"/>
+                <Ionicons name="chevron-down" size={18} color={theme.tokens.textMuted}/>
             </View>
         </Pressable>
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
     wrapper: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "white",
+        backgroundColor: theme.surface,
         borderRadius: 4,
         paddingHorizontal: 10,
         paddingVertical: 10,
-        boxShadow: "0px 0px 10px rgba(0,0,0,0.3)",
+        boxShadow: `0px 0px 10px ${theme.shadow}`,
     },
     inlineLabel: {
         marginRight: 10,
@@ -80,5 +83,4 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
     },
-
 });

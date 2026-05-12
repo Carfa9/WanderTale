@@ -2,6 +2,7 @@
 import {AppText} from "@/components/app-text";
 import {useQuery} from "@tanstack/react-query";
 import {router, useLocalSearchParams} from "expo-router";
+import {Ionicons} from "@expo/vector-icons";
 import {getTripById} from "@/api/trips";
 import {SafeAreaView} from "react-native-safe-area-context";
 import FieldCard from "@/components/field-card";
@@ -11,7 +12,7 @@ import {transportOptionsByKey} from "@/components/transport-options";
 import {Image} from "expo-image";
 import {ExpandableText} from "@/components/expandable-text";
 import TripSectionTabs from "@/components/trip-section-tabs";
-
+import {useTheme} from "@/context/ThemeContext";
 
 const FullScreenMessage = ({children}: { children: React.ReactNode }) => (
     <SafeAreaView
@@ -27,6 +28,8 @@ const FullScreenMessage = ({children}: { children: React.ReactNode }) => (
 );
 
 export default function TripDetails() {
+    const {theme} = useTheme();
+    const styles = createStyles(theme.tokens);
 
     const {id} = useLocalSearchParams<{ id: string | string[] }>();
     const tripId = Array.isArray(id) ? id[0] : id;
@@ -100,10 +103,12 @@ export default function TripDetails() {
                                 <Pressable style={styles.addButton}
                                            onPress={() => router.push(`/trip-details/${tripId}/new-entry`)
                                            }>
+                                    <Ionicons name="create-outline" size={22} color={theme.tokens.textPrimary}/>
                                     <AppText style={styles.addButtonText}>Lägg till anteckning</AppText>
                                 </Pressable>
                                 <Pressable style={[styles.addButton, styles.addButtonSecond]}
                                 onPress={() => router.push(`/trip-details/${tripId}/new-photo`)}>
+                                    <Ionicons name="camera-outline" size={22} color={theme.tokens.textPrimary}/>
                                     <AppText style={styles.addButtonText}>Lägg till foto</AppText>
                                 </Pressable>
                             </View>
@@ -115,20 +120,21 @@ export default function TripDetails() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
     screen: {
         flex: 1,
-        backgroundColor: "#F5EDE4"
+        backgroundColor: theme.background
     },
 
     top: {
         flexDirection: "row",
         alignItems: "flex-end",
         justifyContent: "center",
-        paddingTop: 10,
-        paddingBottom: 10,
-        borderBottomWidth: 15,
-        borderBottomColor: "#C0C0C0",
+        paddingTop: 12,
+        paddingBottom: 12,
+        paddingHorizontal: 52,
+        borderBottomWidth: 10,
+        borderBottomColor: theme.border,
     },
 
     titleWrapper: {
@@ -139,7 +145,7 @@ const styles = StyleSheet.create({
     bottom: {
         flex: 7,
         alignItems: "center",
-        paddingHorizontal: 30,
+        paddingHorizontal: 18,
     },
 
     tabs: {
@@ -150,16 +156,29 @@ const styles = StyleSheet.create({
         width: "100%",
         alignItems: "center",
         position: "relative",
-        marginTop: 15,
+        marginTop: 12,
+        maxWidth: 390,
+        borderRadius: 18,
+        overflow: "hidden",
+        backgroundColor: theme.surfaceAlt,
+        borderWidth: 1,
+        borderColor: theme.borderLight,
+        shadowColor: theme.shadow,
+        shadowOpacity: 0.1,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 4,
     },
 
     paper: {
         width: "100%",
         alignItems: "center",
+        minHeight: 520,
     },
 
     paperImg: {
         resizeMode: "cover",
+        opacity: 0.34,
     },
 
     fieldValue: {
@@ -169,37 +188,45 @@ const styles = StyleSheet.create({
 
     content: {
         width: "100%",
-        maxWidth: 250,
-        paddingHorizontal: 0,
-        paddingVertical: 20,
-        borderRadius: 18,
+        maxWidth: 330,
+        paddingHorizontal: 16,
+        paddingVertical: 22,
         paddingBottom: 30,
     },
 
     buttonContainer: {
         width: "100%",
-        marginTop: 30,
+        marginTop: 24,
+        gap: 10,
     },
 
     addButton: {
         width: "100%",
+        minHeight: 52,
         paddingVertical: 12,
         paddingHorizontal: 16,
         borderRadius: 12,
-        backgroundColor: "#D5F7F4",
+        backgroundColor: theme.accentSoft,
         borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.08)",
+        borderColor: theme.borderLight,
         justifyContent: "center",
-        alignItems: "flex-start",
+        alignItems: "center",
+        flexDirection: "row",
+        shadowColor: theme.shadow,
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 3,
     },
 
     addButtonSecond: {
-        marginTop: 12,
+        backgroundColor: theme.tape,
     },
 
     addButtonText: {
         fontSize: 20,
-        paddingHorizontal: 30,
+        paddingLeft: 10,
+        color: theme.textPrimary,
     },
 
     modeRow: {

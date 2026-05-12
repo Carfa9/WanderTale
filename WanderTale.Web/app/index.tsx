@@ -1,4 +1,4 @@
-import {View, Text, ImageBackground, Pressable, StyleSheet, FlatList} from "react-native";
+import {View, Text, ImageBackground, Pressable, StyleSheet, FlatList, Button} from "react-native";
 import {useQuery} from "@tanstack/react-query";
 import {getTrips} from "@/api/trips";
 import {SafeAreaView} from "react-native-safe-area-context";
@@ -8,9 +8,13 @@ import {useMemo, useState} from "react";
 import {AppText} from "@/components/app-text";
 import {Trip} from "@/types/trip";
 import {FormatDate, SafeDate} from "@/components/format-date";
-
+import {useTheme} from "@/context/ThemeContext";
 
 export default function Index() {
+    const {theme} = useTheme();
+    const tokens = theme.tokens;
+    const styles = createStyles(tokens);
+
     const {data, isLoading, error} = useQuery<Trip[]>({
         queryKey: ["trips"],
         queryFn: getTrips,
@@ -67,14 +71,15 @@ export default function Index() {
                         <AppText size={40}>Mina resor</AppText>
                         <View style={styles.newTrip}>
                             <Pressable style={{alignItems: "center"}} onPress={() => router.push("/plan-trip")}>
-                                <Ionicons name="location-outline" size={40} color="#333"/>
+                                <Ionicons name="location-outline" size={40} color={tokens.textPrimary}/>
                                 <AppText style={styles.iconText}>Ny resa</AppText>
                             </Pressable>
                         </View></View>
                     <View style={styles.bottom}>
                         <ImageBackground
                             source={require("@/assets/images/TheWorld.png")}
-                            style={{flex: 1}}
+                            style={styles.mapBg}
+                            imageStyle={styles.mapImage}
                             resizeMode="cover"
                         >
                             <View style={styles.sectionTabs}>
@@ -110,15 +115,29 @@ export default function Index() {
                                 )}
                             />
                         </ImageBackground>
+                        <Pressable
+                            onPress={() => {
+                                router.push("/settings");
+                            }}
+                            hitSlop={12}
+                            style={({pressed}) => [
+                                styles.settingsBtn,
+                                {backgroundColor: tokens.background},
+                                pressed && styles.settingsBtnPressed,
+                            ]}
+                        >
+                            <Ionicons name="contrast-outline" size={24} color={tokens.textPrimary}/>
+                        </Pressable>
                     </View>
                 </>
+                
             )}
         </SafeAreaView>
     );
 }
 
-const styles = StyleSheet.create({
-    screen: {flex: 1, backgroundColor: "#F5EDE4"},
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
+    screen: {flex: 1, backgroundColor: theme.background},
 
     newTrip: {
         marginTop: 16,
@@ -130,7 +149,7 @@ const styles = StyleSheet.create({
         flex: 1, alignItems: "center",
         justifyContent: "center",
         borderBottomWidth: 15,
-        borderBottomColor: "#C0C0C0",
+        borderBottomColor: theme.border,
     },
 
     headline: {
@@ -148,6 +167,11 @@ const styles = StyleSheet.create({
 
     mapBg: {
         flex: 1,
+        backgroundColor: theme.surfaceAlt,
+    },
+
+    mapImage: {
+        opacity: theme.background === "#12192A" ? 0.18 : 0.62,
     },
 
     listContent: {
@@ -169,11 +193,13 @@ const styles = StyleSheet.create({
         opacity: 0.40,
         fontSize: 23,
         lineHeight: 30,
+        color: theme.textSecondary,
     },
     sectionTabActive: {
         fontSize: 28,
         opacity: 1,
         textDecorationLine: "underline",
+        color: theme.textPrimary,
     },
 
     tripCard: {
@@ -183,10 +209,10 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 14,
         borderRadius: 12,
-        backgroundColor: "rgba(213, 247, 244, 0.85)",
+        backgroundColor: theme.accentSoft,
         borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.08)",
-        shadowColor: "#000",
+        borderColor: theme.borderLight,
+        shadowColor: theme.shadow,
         shadowOpacity: 0.1,
         shadowRadius: 6,
         shadowOffset: {width: 0, height: 3},
@@ -214,5 +240,18 @@ const styles = StyleSheet.create({
         justifyContent: "space-around",
         paddingHorizontal: 16,
         paddingVertical: 10,
+    },
+
+    settingsBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    settingsBtnPressed: {
+        opacity: 0.9,
+        transform: [{scale: 0.98}],
     },
 })

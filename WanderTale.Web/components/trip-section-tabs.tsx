@@ -1,17 +1,20 @@
-﻿import {router, usePathname} from "expo-router";
-import {Pressable, View, StyleSheet, Text} from "react-native";
+import {router, usePathname} from "expo-router";
+import {Pressable, StyleSheet, View} from "react-native";
 import {AppText} from "@/components/app-text";
+import {useTheme} from "@/context/ThemeContext";
 
 type Props = {
     tripId: string;
 };
 
 export default function TripSectionTabs({ tripId }: Props) {
+    const {theme} = useTheme();
+    const styles = createStyles(theme.tokens);
     const pathname = usePathname();
-    
+
     const isDetails = pathname === `/trip-details/${tripId}`;
     const isMemories = pathname === `/trip-details/${tripId}/memories`;
-    
+
     return (
         <View style={styles.wrapper}>
             <Pressable
@@ -21,7 +24,7 @@ export default function TripSectionTabs({ tripId }: Props) {
                     isDetails ? styles.activeTab : styles.inactiveTab,
                 ]}
             >
-                <AppText >Resan</AppText>
+                <AppText>Resan</AppText>
             </Pressable>
 
             <Pressable
@@ -31,40 +34,44 @@ export default function TripSectionTabs({ tripId }: Props) {
                     isMemories ? styles.activeTab : styles.inactiveTab,
                 ]}
             >
-                <AppText >Minnen
-                </AppText>
+                <AppText>Minnen</AppText>
             </Pressable>
         </View>
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
     wrapper: {
         flexDirection: "row",
         alignItems: "flex-start",
         marginBottom: 0,
         paddingHorizontal: 16,
-        gap: 8,
+        gap: 6,
     },
     tab: {
         minWidth: 120,
         paddingHorizontal: 18,
-        borderTopLeftRadius: 4,
-        borderTopRightRadius: 4,
-        borderBottomLeftRadius: 14,
-        borderBottomRightRadius: 14,
+        borderTopLeftRadius: 5,
+        borderTopRightRadius: 5,
+        borderBottomLeftRadius: 12,
+        borderBottomRightRadius: 12,
         borderWidth: 1,
-        borderColor: "#d8cfbf",
+        borderColor: theme.border,
         alignItems: "center",
         justifyContent: "center",
     },
     activeTab: {
-        height: 52,
-        backgroundColor: "#faf4e8",
+        height: 50,
+        backgroundColor: theme.surface,
+        shadowColor: theme.shadow,
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 2,
     },
     inactiveTab: {
-        height: 44,
-        opacity: 0.92,
-        backgroundColor: "#e7dfd1",
+        height: 42,
+        opacity: 0.9,
+        backgroundColor: theme.surfaceAlt,
     },
 });

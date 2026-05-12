@@ -1,4 +1,3 @@
-import {DarkTheme, DefaultTheme, ThemeProvider} from '@react-navigation/native';
 import {Stack, router, usePathname} from 'expo-router';
 import {StatusBar} from 'expo-status-bar';
 import 'react-native-reanimated';
@@ -11,6 +10,7 @@ import {Ionicons} from "@expo/vector-icons";
 import {useFonts} from "expo-font";
 import {IndieFlower_400Regular} from "@expo-google-fonts/indie-flower";
 import {GestureHandlerRootView} from "react-native-gesture-handler";
+import {ThemeProvider, useTheme} from "@/context/ThemeContext";
 
 export default function RootLayout() {
 
@@ -28,20 +28,29 @@ export default function RootLayout() {
         <GestureHandlerRootView style={{flex: 1}}>
             <SafeAreaProvider>
                 <QueryClientProvider client={queryClient}>
+                    <ThemeProvider>
 
-                    <Stack screenOptions={{headerShown: false}}/>
+                        <Stack screenOptions={{headerShown: false}}/>
 
-                    <StatusBar style="auto"/>
-                    <HomeOverlayButton/>
+                        <ThemedStatusBar/>
+                        <HomeOverlayButton/>
+                    </ThemeProvider>
                 </QueryClientProvider>
             </SafeAreaProvider>
         </GestureHandlerRootView>
     );
 }
 
+function ThemedStatusBar() {
+    const {theme} = useTheme();
+    return <StatusBar style={theme.tokens.isDark ? 'light' : 'dark'}/>;
+}
+
 function HomeOverlayButton() {
     const insets = useSafeAreaInsets();
     const pathname = usePathname();
+    const {theme} = useTheme();
+    const tokens = theme.tokens;
 
     if (pathname === "/") return null;
 
@@ -59,9 +68,13 @@ function HomeOverlayButton() {
                     router.replace("/");
                 }}
                 hitSlop={12}
-                style={({pressed}) => [styles.homeBtn, pressed && styles.homeBtnPressed]}
+                style={({pressed}) => [
+                    styles.homeBtn,
+                    {backgroundColor: tokens.background},
+                    pressed && styles.homeBtnPressed,
+                ]}
             >
-                <Ionicons name="home-outline" size={24} color="#111"/>
+                <Ionicons name="home-outline" size={24} color={tokens.textPrimary}/>
             </Pressable>
         </View>
     );
@@ -83,7 +96,6 @@ const styles = StyleSheet.create({
         borderRadius: 22,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#F5EDE4",
     },
 
     homeBtnPressed: {

@@ -4,9 +4,11 @@ import NewTripForm from "@/components/new-trip-form";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {createTrip} from "@/api/trips";
 import {AppText} from "@/components/app-text";
-
+import {useTheme} from "@/context/ThemeContext";
 
 export default function PlanTrip() {
+    const {theme} = useTheme();
+    const styles = createStyles(theme.tokens);
     const queryClient = useQueryClient();
     
     const createTripMutation = useMutation({
@@ -38,15 +40,15 @@ export default function PlanTrip() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
     keyboard: {flex: 1},    
-    screen: {flex: 1, backgroundColor: "#F5EDE4"},
+    screen: {flex: 1, backgroundColor: theme.background},
 
     top: {
         flex: 3, alignItems: "center",
         justifyContent: "center",
         borderBottomWidth: 15,
-        borderBottomColor: "#C0C0C0"
+        borderBottomColor: theme.border
     },
     bottom: {
         flex: 4

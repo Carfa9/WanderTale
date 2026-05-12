@@ -12,7 +12,7 @@ import {TravelModeKey, travelModeKeys} from "@/types/travelMode";
 import {createTrip} from "@/api/trips";
 import {CreateTripDto} from "@/types/trip";
 import {transportOptionList} from "@/components/transport-options";
-
+import {useTheme} from "@/context/ThemeContext";
 
 const schema = z
     .object({
@@ -41,6 +41,9 @@ const schema = z
 type FormData = z.infer<typeof schema>;
 
 export default function NewTripForm() {
+    const {theme} = useTheme();
+    const styles = createStyles(theme.tokens);
+
     
     const form = useForm<FormData>({
         resolver: zodResolver(schema) as any,
@@ -240,7 +243,7 @@ export default function NewTripForm() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
     container: {
         padding: 50, 
         gap: 20
@@ -263,7 +266,7 @@ const styles = StyleSheet.create({
     },
     
     error: {
-        color: "red", 
+        color: theme.error, 
         marginTop: 4
     },
     
@@ -280,7 +283,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 14,
         borderRadius: 12,
-        backgroundColor: "#D5F7F4",
+        backgroundColor: theme.accentSoft,
         borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.08)",},
+        borderColor: theme.borderLight,},
 });

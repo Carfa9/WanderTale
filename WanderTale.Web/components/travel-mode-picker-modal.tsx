@@ -4,6 +4,7 @@ import {AppText} from "@/components/app-text";
 import { Image } from "expo-image";
 import {TravelModeKey} from "@/types/travelMode";
 import {transportOptionList} from "@/components/transport-options";
+import {useTheme} from "@/context/ThemeContext";
 
 type Props = {
     visible: boolean;
@@ -14,6 +15,9 @@ type Props = {
 };
 
 export default function TravelModePickerModal({visible, value, onClose, onSelect}: Props) {
+    const {theme} = useTheme();
+    const styles = createStyles(theme.tokens);
+
     return (
         <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
             <Pressable style={styles.backdrop} onPress={onClose}>
@@ -46,17 +50,17 @@ export default function TravelModePickerModal({visible, value, onClose, onSelect
 
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
     backdrop: {
         flex: 1,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backgroundColor: theme.shadow,
     },
     sheet: {
         position: "absolute",
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "white",
+        backgroundColor: theme.surface,
         padding: 16,
         borderTopLeftRadius: 16,
         borderTopRightRadius: 16,
@@ -78,14 +82,14 @@ const styles = StyleSheet.create({
         width: 100,
         height: 100,
         borderRadius: 10,
-        backgroundColor: "#F5EDE4",
+        backgroundColor: theme.background,
         alignItems: "center",
         justifyContent: "center",
         padding: 10,
     },
     cardSelected: {
         borderWidth: 2,
-        borderColor: "#000",
+        borderColor: theme.textPrimary,
     },
 
 });

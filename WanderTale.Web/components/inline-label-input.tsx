@@ -1,6 +1,7 @@
-﻿import React from "react";
-import {View, TextInput, StyleSheet, TextInputProps, Keyboard} from "react-native";
-import { AppText } from "@/components/app-text";
+import React from "react";
+import {Keyboard, StyleSheet, TextInput, TextInputProps, View} from "react-native";
+import {AppText} from "@/components/app-text";
+import {useTheme} from "@/context/ThemeContext";
 
 type Props = {
     label: string;
@@ -13,18 +14,19 @@ type Props = {
 };
 
 export function InlineLabelInput({
-                                     label,
-                                     value,
-                                     onChangeText,
-                                     onBlur,
-                                     placeholder,
-                                     inputStyles,
-                                     inputProps,
-                                 }: Props) {
+    label,
+    value,
+    onChangeText,
+    onBlur,
+    placeholder,
+    inputStyles,
+    inputProps,
+}: Props) {
+    const {theme} = useTheme();
+    const styles = createStyles(theme.tokens);
     const isMultiline = !!inputProps?.multiline;
-
     const parentOnSubmit = inputProps?.onSubmitEditing;
-    
+
     return (
         <View style={[styles.wrapper, isMultiline && styles.wrapperMultiline]}>
             <AppText style={styles.inlineLabel}>{label}</AppText>
@@ -35,7 +37,7 @@ export function InlineLabelInput({
                 onChangeText={onChangeText}
                 onBlur={onBlur}
                 placeholder={placeholder}
-                placeholderTextColor="#9aa0a6"
+                placeholderTextColor={theme.tokens.textMuted}
                 returnKeyType={isMultiline ? "default" : "done"}
                 submitBehavior={isMultiline ? "newline" : "blurAndSubmit"}
                 onSubmitEditing={(e) => {
@@ -48,15 +50,15 @@ export function InlineLabelInput({
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
     wrapper: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "white",
+        backgroundColor: theme.surface,
         borderRadius: 4,
         paddingHorizontal: 10,
         paddingVertical: 10,
-        boxShadow: "0px 0px 10px rgba(0,0,0,0.3)",
+        boxShadow: `0px 0px 10px ${theme.shadow}`,
     },
     wrapperMultiline: {
         alignItems: "flex-start",

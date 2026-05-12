@@ -1,6 +1,7 @@
-﻿import {View, StyleSheet} from "react-native";
-import {AppText} from "@/components/app-text";
 import React from "react";
+import {StyleSheet, View} from "react-native";
+import {AppText} from "@/components/app-text";
+import {useTheme} from "@/context/ThemeContext";
 
 type Props = {
     label: string;
@@ -11,27 +12,28 @@ type Props = {
     stackedValue?: boolean;
 };
 
-
 export default function FieldCard({
- label,
- value,
- placeholder = "Under planering",
- children,
-  multiline = false,
+    label,
+    value,
+    placeholder = "Under planering",
+    children,
+    multiline = false,
     stackedValue = false,
-  }: Props) {
+}: Props) {
+    const {theme} = useTheme();
+    const styles = createStyles(theme.tokens);
     const text = value?.trim() ? value : placeholder;
 
     return (
         <View style={[styles.fieldCard, multiline && styles.fieldCardMultiline]}>
             <View style={styles.headerRow}>
-            <AppText style={styles.fieldLabel}>{label}</AppText>
+                <AppText style={styles.fieldLabel}>{label}</AppText>
                 {!stackedValue && (
-            <View style={styles.right}>
-                {children ? children : <AppText style={styles.fieldValue}>{text}</AppText>}
-            </View>
+                    <View style={styles.right}>
+                        {children ? children : <AppText style={styles.fieldValue}>{text}</AppText>}
+                    </View>
                 )}
-        </View>
+            </View>
             {stackedValue && (
                 <View style={styles.stackBody}>
                     {children ? children : <AppText style={styles.stackText}>{text}</AppText>}
@@ -41,62 +43,50 @@ export default function FieldCard({
     );
 }
 
-
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
     fieldCard: {
         width: "100%",
-        maxWidth: 250,
+        maxWidth: 330,
         alignSelf: "center",
-        paddingVertical: 12,
-        paddingHorizontal: 14,
-        borderRadius: 12,
-        backgroundColor: "rgba(213, 247, 244, 0.85)",
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: theme.surface,
         borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.08)",
-        marginBottom: 12,
-
-        shadowColor: "#000",
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 3 },
-        elevation: 2,
+        borderColor: theme.borderLight,
+        marginBottom: 10,
     },
-
     headerRow: {
         flexDirection: "row",
         alignItems: "center",
     },
-
     fieldLabel: {
         fontFamily: "Nunito_600SemiBold",
-        fontSize: 16,
-        letterSpacing: 0.3,
+        fontSize: 15,
+        color: theme.textSecondary,
     },
-
     fieldValue: {
         textAlign: "right",
+        fontSize: 17,
+        color: theme.textPrimary,
     },
-
     right: {
         flex: 1,
         alignItems: "flex-end",
     },
-
     fieldCardMultiline: {
         alignItems: "flex-start",
     },
-
     rightMultiline: {
         justifyContent: "flex-start",
         alignItems: "stretch",
     },
-
     stackBody: {
-        marginTop: 8,
+        marginTop: 6,
         width: "100%",
     },
-
     stackText: {
         textAlign: "left",
+        color: theme.textPrimary,
     },
-})
+});

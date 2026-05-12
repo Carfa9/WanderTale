@@ -7,6 +7,7 @@ import { AppText } from "@/components/app-text";
 import { InlineLabelInput } from "@/components/inline-label-input";
 import DateInput from "@/components/date-input";
 import { CreateEntryDto } from "@/dto/createEntryDto";
+import {useTheme} from "@/context/ThemeContext";
 
 const schema = z.object({
     entryDate: z.string().nullable(),
@@ -23,6 +24,9 @@ type Props = {
 };
 
 export default function NewEntryForm({ onSubmit, isSaving, errorMessage }: Props) {
+    const {theme} = useTheme();
+    const styles = createStyles(theme.tokens);
+
     const form = useForm<FormData>({
         resolver: zodResolver(schema) as any,
         defaultValues: {
@@ -113,7 +117,7 @@ export default function NewEntryForm({ onSubmit, isSaving, errorMessage }: Props
 }
 
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
     container: {
         flex: 1,        
         padding: 50,
@@ -132,7 +136,7 @@ const styles = StyleSheet.create({
     },
 
     input: {
-        borderColor: "white",
+        borderColor: theme.surface,
         borderWidth: 1,
         borderRadius: 10,
         paddingHorizontal: 12,
@@ -144,7 +148,7 @@ const styles = StyleSheet.create({
     },
 
     error: {
-        color: "red",
+        color: theme.error,
         marginTop: 4
     },
 
@@ -161,8 +165,8 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 14,
         borderRadius: 12,
-        backgroundColor: "#D5F7F4",
+        backgroundColor: theme.accentSoft,
         borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.08)",
+        borderColor: theme.borderLight,
     },
 });

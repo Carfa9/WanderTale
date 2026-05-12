@@ -22,8 +22,11 @@ import { InlineLabelInput } from "@/components/inline-label-input";
 import { convertToJpg } from "@/components/convert-to-jpg";
 import { Entry } from "@/types/entry";
 import { FormatDate } from "@/components/format-date";
+import {useTheme} from "@/context/ThemeContext";
 
 export default function NewPhoto() {
+    const {theme} = useTheme();
+    const styles = createStyles(theme.tokens);
     const { id, entryId: entryIdParam } = useLocalSearchParams<{ id: string; entryId?: string }>();
     const tripId = String(id);
     const queryClient = useQueryClient();
@@ -150,7 +153,7 @@ export default function NewPhoto() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
     headLine: { paddingTop: 50, alignItems: "center" },
     keyboard: { flex: 1 },
     container: { flex: 1, padding: 50, gap: 20 },
@@ -159,13 +162,13 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         borderBottomWidth: 1,
-        borderBottomColor: "rgba(0,0,0,0.15)",
+        borderBottomColor: theme.borderLight,
         paddingVertical: 8,
         gap: 4,
     },
     entryPickerLabel: { fontSize: 18 },
-    entryPickerValue: { fontSize: 18, flex: 1, color: "rgba(0,0,0,0.6)" },
-    error: { color: "red", marginTop: 4 },
+    entryPickerValue: { fontSize: 18, flex: 1, color: theme.textSecondary },
+    error: { color: theme.error, marginTop: 4 },
     submit: { fontSize: 20, textAlignVertical: "center", alignSelf: "center" },
     submitButton: {
         alignSelf: "center",
@@ -174,17 +177,17 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 14,
         borderRadius: 12,
-        backgroundColor: "#D5F7F4",
+        backgroundColor: theme.accentSoft,
         borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.08)",
+        borderColor: theme.borderLight,
     },
     modalBackdrop: {
         flex: 1,
         justifyContent: "flex-end",
-        backgroundColor: "rgba(0,0,0,0.35)",
+        backgroundColor: theme.shadow,
     },
     modalSheet: {
-        backgroundColor: "#F5EDE4",
+        backgroundColor: theme.background,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         padding: 24,
@@ -196,9 +199,9 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 16,
         borderRadius: 10,
-        backgroundColor: "rgba(255,255,255,0.5)",
+        backgroundColor: theme.surface,
         gap: 2,
     },
-    entryOptionSelected: { backgroundColor: "#D5F7F4" },
-    entryOptionDate: { fontSize: 13, color: "rgba(0,0,0,0.5)" },
+    entryOptionSelected: { backgroundColor: theme.accentSoft },
+    entryOptionDate: { fontSize: 13, color: theme.textMuted },
 });
