@@ -34,7 +34,7 @@ export default function TravelModePickerModal({visible, value, onClose, onSelect
                                 onPress={() => onSelect(option.key)}
                                 style={[styles.card, selected && styles.cardSelected]}
                             >
-                                <Image source={option.image} style={styles.icon} contentFit="contain"/>
+                                <Image source={option.image} style={styles.icon} contentFit="contain" tintColor={theme.tokens.textPrimary}/>
                                 <AppText>{option.label}</AppText>
                             </Pressable>
                         );

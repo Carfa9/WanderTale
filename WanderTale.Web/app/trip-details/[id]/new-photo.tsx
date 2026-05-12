@@ -82,8 +82,13 @@ export default function NewPhoto() {
         : "Ingen";
 
     return (
-        <SafeAreaView style={{ flex: 1 }}>
-            <ImageBackground source={require("@/assets/images/TheWorld.png")} style={{ flex: 1 }} resizeMode="cover">
+        <SafeAreaView style={styles.screen}>
+            <ImageBackground
+                source={require("@/assets/images/TheWorld.png")}
+                style={styles.background}
+                imageStyle={styles.backgroundImage}
+                resizeMode="cover"
+            >
                 <View style={styles.headLine}>
                     <AppText size={30}>Foto</AppText>
                 </View>
@@ -154,6 +159,9 @@ export default function NewPhoto() {
 }
 
 const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
+    screen: { flex: 1, backgroundColor: theme.background },
+    background: { flex: 1, backgroundColor: theme.surfaceAlt },
+    backgroundImage: { opacity: theme.isDark ? 0.18 : 0.62 },
     headLine: { paddingTop: 50, alignItems: "center" },
     keyboard: { flex: 1 },
     container: { flex: 1, padding: 50, gap: 20 },

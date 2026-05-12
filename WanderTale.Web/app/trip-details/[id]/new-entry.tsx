@@ -6,17 +6,20 @@ import { AppText } from "@/components/app-text";
 import NewEntryForm from "@/components/new-entry-form";
 import { useLocalSearchParams, router } from "expo-router";
 import { CreateEntryDto } from "@/dto/createEntryDto";
+import {useTheme} from "@/context/ThemeContext";
 
 export default function NewEntry() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const tripId = String(id);
     const queryClient = useQueryClient();
+    const {theme} = useTheme();
+    const styles = createStyles(theme.tokens);
 
     const createEntryMutation = useMutation({
         mutationFn: (dto: CreateEntryDto) => createEntry(tripId, dto),
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ["entries", tripId] });
-            router.replace(`/trip-details/${tripId}/(tabs)`);
+            router.back();
         },
         onError: (err) => {
             console.log("CREATE ERROR:", err);
@@ -24,8 +27,13 @@ export default function NewEntry() {
     });
 
     return (
-        <SafeAreaView style={{ flex: 1 }}>
-            <ImageBackground source={require("@/assets/images/TheWorld.png")} style={{ flex: 1 }} resizeMode="cover">
+        <SafeAreaView style={styles.screen}>
+            <ImageBackground
+                source={require("@/assets/images/TheWorld.png")}
+                style={styles.background}
+                imageStyle={styles.backgroundImage}
+                resizeMode="cover"
+            >
                 <View style={styles.headLine}>
                     <AppText size={30}>Anteckningar</AppText>
                 </View>
@@ -49,7 +57,18 @@ export default function NewEntry() {
 }
 
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => StyleSheet.create({
+    screen: {
+        flex: 1,
+        backgroundColor: theme.background,
+    },
+    background: {
+        flex: 1,
+        backgroundColor: theme.surfaceAlt,
+    },
+    backgroundImage: {
+        opacity: theme.isDark ? 0.18 : 0.62,
+    },
     headLine: {
         paddingTop: 50,
         alignItems: "center",

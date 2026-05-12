@@ -72,6 +72,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => 
         flex: 1,
         fontSize: 18,
         paddingVertical: 0,
+        color: theme.textPrimary,
     },
     textarea: {
         minHeight: 90,

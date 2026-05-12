@@ -227,6 +227,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => 
         marginTop: 4,
         fontSize: 13,
         opacity: 0.6,
+        color: theme.textPrimary
     },
 
     tripRow: {

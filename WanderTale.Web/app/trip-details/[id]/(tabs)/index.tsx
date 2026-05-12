@@ -83,6 +83,7 @@ export default function TripDetails() {
                                                 source={transportOptionsByKey[key]}
                                                 style={styles.modeIcon}
                                                 contentFit="contain"
+                                                tintColor={theme.tokens.textPrimary}
                                             />
                                         ))}
                                     </View>
@@ -103,12 +104,10 @@ export default function TripDetails() {
                                 <Pressable style={styles.addButton}
                                            onPress={() => router.push(`/trip-details/${tripId}/new-entry`)
                                            }>
-                                    <Ionicons name="create-outline" size={22} color={theme.tokens.textPrimary}/>
                                     <AppText style={styles.addButtonText}>Lägg till anteckning</AppText>
                                 </Pressable>
                                 <Pressable style={[styles.addButton, styles.addButtonSecond]}
                                 onPress={() => router.push(`/trip-details/${tripId}/new-photo`)}>
-                                    <Ionicons name="camera-outline" size={22} color={theme.tokens.textPrimary}/>
                                     <AppText style={styles.addButtonText}>Lägg till foto</AppText>
                                 </Pressable>
                             </View>
