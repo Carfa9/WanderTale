@@ -3,7 +3,7 @@ import {StatusBar} from 'expo-status-bar';
 import 'react-native-reanimated';
 import {SafeAreaProvider, useSafeAreaInsets} from "react-native-safe-area-context";
 import {View, Pressable, StyleSheet} from "react-native";
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {QueryClient} from "@tanstack/query-core";
 import {QueryClientProvider} from "@tanstack/react-query";
 import {Ionicons} from "@expo/vector-icons";
@@ -11,16 +11,34 @@ import {useFonts} from "expo-font";
 import {IndieFlower_400Regular} from "@expo-google-fonts/indie-flower";
 import {GestureHandlerRootView} from "react-native-gesture-handler";
 import {ThemeProvider, useTheme} from "@/context/ThemeContext";
+import {initializeLocalSchema} from "@/local/schema";
 
 export default function RootLayout() {
 
     const [queryClient] = useState(() => new QueryClient());
+    const [localDbReady, setLocalDbReady] = useState(false);
 
     const [fontsLoaded] = useFonts({
         IndieFlower: IndieFlower_400Regular,
     });
 
-    if (!fontsLoaded) {
+    useEffect(() => {
+        let isMounted = true;
+
+        initializeLocalSchema()
+            .catch((error) => {
+                console.log("Failed to initialize local database:", error);
+            })
+            .finally(() => {
+                if (isMounted) setLocalDbReady(true);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    if (!fontsLoaded || !localDbReady) {
         return null;
     }
 
