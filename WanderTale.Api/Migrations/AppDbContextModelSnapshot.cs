@@ -50,39 +50,6 @@ namespace WanderTale.Migrations
                     b.ToTable("Entries");
                 });
 
-            modelBuilder.Entity("WanderTale.Models.Leg", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("DueDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsCompleted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("TripId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("tripModeId")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TripId");
-
-                    b.ToTable("Leg");
-                });
-
             modelBuilder.Entity("WanderTale.Models.Photo", b =>
                 {
                     b.Property<Guid>("Id")
@@ -119,6 +86,67 @@ namespace WanderTale.Migrations
                     b.HasIndex("TripId");
 
                     b.ToTable("Photo");
+                });
+
+            modelBuilder.Entity("WanderTale.Models.Stop", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Country")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("EndDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("OrderIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("StartDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TripId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TripId");
+
+                    b.ToTable("Stops");
+                });
+
+            modelBuilder.Entity("WanderTale.Models.StopTravelMode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("StopId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StopId");
+
+                    b.ToTable("StopTravelModes");
                 });
 
             modelBuilder.Entity("WanderTale.Models.Trip", b =>
@@ -188,15 +216,6 @@ namespace WanderTale.Migrations
                     b.Navigation("Trip");
                 });
 
-            modelBuilder.Entity("WanderTale.Models.Leg", b =>
-                {
-                    b.HasOne("WanderTale.Models.Trip", null)
-                        .WithMany("Legs")
-                        .HasForeignKey("TripId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("WanderTale.Models.Photo", b =>
                 {
                     b.HasOne("WanderTale.Models.Trip", "Trip")
@@ -206,6 +225,28 @@ namespace WanderTale.Migrations
                         .IsRequired();
 
                     b.Navigation("Trip");
+                });
+
+            modelBuilder.Entity("WanderTale.Models.Stop", b =>
+                {
+                    b.HasOne("WanderTale.Models.Trip", "Trip")
+                        .WithMany("Stops")
+                        .HasForeignKey("TripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Trip");
+                });
+
+            modelBuilder.Entity("WanderTale.Models.StopTravelMode", b =>
+                {
+                    b.HasOne("WanderTale.Models.Stop", "Stop")
+                        .WithMany("TravelModes")
+                        .HasForeignKey("StopId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Stop");
                 });
 
             modelBuilder.Entity("WanderTale.Models.TripTravelMode", b =>
@@ -219,13 +260,18 @@ namespace WanderTale.Migrations
                     b.Navigation("Trip");
                 });
 
+            modelBuilder.Entity("WanderTale.Models.Stop", b =>
+                {
+                    b.Navigation("TravelModes");
+                });
+
             modelBuilder.Entity("WanderTale.Models.Trip", b =>
                 {
                     b.Navigation("Entries");
 
-                    b.Navigation("Legs");
-
                     b.Navigation("Photos");
+
+                    b.Navigation("Stops");
 
                     b.Navigation("TravelModes");
                 });

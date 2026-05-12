@@ -169,10 +169,9 @@ const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => 
     },
     paperImg: {opacity: 0.42},
     content: {width: "100%", marginTop: 60},
-    scrollContent: {paddingBottom: 40, paddingTop: 6},
+    scrollContent: {paddingBottom: 40, paddingTop: 6, paddingHorizontal: 24,},
     entriesSection: {
         marginTop: 26,
-        paddingHorizontal: 24,
         gap: 10,
     },
     entriesHeading: {
