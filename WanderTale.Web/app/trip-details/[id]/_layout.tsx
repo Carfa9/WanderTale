@@ -8,6 +8,8 @@ export default function TripDetailsLayout() {
             <Stack.Screen name="new-photo" />
             <Stack.Screen name="album" />
             <Stack.Screen name="entry/[entryId]" />
+            <Stack.Screen name="stops" />
+            <Stack.Screen name="new-stop" />
         </Stack>
     );
 }

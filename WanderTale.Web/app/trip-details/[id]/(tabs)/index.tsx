@@ -13,6 +13,7 @@ import {Image} from "expo-image";
 import {ExpandableText} from "@/components/expandable-text";
 import TripSectionTabs from "@/components/trip-section-tabs";
 import {useTheme} from "@/context/ThemeContext";
+import {getStopsByTripId} from "@/api/stops";
 
 const FullScreenMessage = ({children}: { children: React.ReactNode }) => (
     <SafeAreaView
@@ -37,6 +38,12 @@ export default function TripDetails() {
     const {data: trip, isLoading, error} = useQuery({
         queryKey: ["trip", tripId],
         queryFn: () => getTripById(String(tripId)),
+        enabled: !!tripId,
+    });
+
+    const {data: stops = []} = useQuery({
+        queryKey: ["stops", tripId],
+        queryFn: () => getStopsByTripId(String(tripId)),
         enabled: !!tripId,
     });
 
@@ -100,6 +107,32 @@ export default function TripDetails() {
                                 />
                             </FieldCard>
 
+                            <View style={styles.stopsSection}>
+                                <View style={styles.stopsHeader}>
+                                    <AppText size={20}>Platser längs vägen</AppText>
+                                    <Ionicons name="map-outline" size={22} color={theme.tokens.textPrimary}/>
+                                </View>
+                                <AppText style={styles.stopsText}>
+                                    {stops.length > 0
+                                        ? `${stops.length} platser tillagda`
+                                        : ""}
+                                </AppText>
+                                <View style={styles.stopButtonSection}>
+                                    <Pressable
+                                        style={styles.addStopButton}
+                                        onPress={() => router.push(`/trip-details/${tripId}/new-stop`)}
+                                    >
+                                        <AppText style={styles.buttonText}>Lägg till stopp</AppText>
+                                    </Pressable>
+                                    <Pressable
+                                        style={styles.stopsButton}
+                                        onPress={() => router.push(`/trip-details/${tripId}/stops`)}
+                                    >
+                                        <AppText style={styles.stopsButtonText}>Visa stopp</AppText>
+                                    </Pressable>
+                                </View>
+                            </View>
+
                             <View style={styles.buttonContainer}>
                                 <Pressable style={styles.addButton}
                                            onPress={() => router.push(`/trip-details/${tripId}/new-entry`)
@@ -107,7 +140,7 @@ export default function TripDetails() {
                                     <AppText style={styles.addButtonText}>Lägg till anteckning</AppText>
                                 </Pressable>
                                 <Pressable style={[styles.addButton, styles.addButtonSecond]}
-                                onPress={() => router.push(`/trip-details/${tripId}/new-photo`)}>
+                                           onPress={() => router.push(`/trip-details/${tripId}/new-photo`)}>
                                     <AppText style={styles.addButtonText}>Lägg till foto</AppText>
                                 </Pressable>
                             </View>
@@ -165,7 +198,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => 
         shadowColor: theme.shadow,
         shadowOpacity: 0.1,
         shadowRadius: 14,
-        shadowOffset: { width: 0, height: 6 },
+        shadowOffset: {width: 0, height: 6},
         elevation: 4,
     },
 
@@ -199,6 +232,51 @@ const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => 
         gap: 10,
     },
 
+    stopsSection: {
+        marginTop: 18,
+        padding: 16,
+        borderRadius: 12,
+        backgroundColor: theme.surface,
+        borderWidth: 1,
+        borderColor: theme.borderLight,
+        
+    },
+
+    stopButtonSection: {
+        flexDirection: "row",
+        width: "100%",
+        marginTop: 12,
+        gap: 10,
+    },
+
+    stopsHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+    },
+
+    stopsText: {
+        color: theme.textSecondary,
+        lineHeight: 21,
+    },
+
+    stopsButton: {
+        width: "47%",
+        alignItems: "center",
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        backgroundColor: theme.accentSoft,
+        borderWidth: 1,
+        borderColor: theme.borderLight,
+    },
+
+    stopsButtonText: {
+        color: theme.textPrimary,
+        fontSize: 16,
+    },
+
     addButton: {
         width: "100%",
         minHeight: 52,
@@ -214,7 +292,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => 
         shadowColor: theme.shadow,
         shadowOpacity: 0.12,
         shadowRadius: 8,
-        shadowOffset: { width: 0, height: 3 },
+        shadowOffset: {width: 0, height: 3},
         elevation: 3,
     },
 
@@ -227,6 +305,18 @@ const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => 
         paddingLeft: 10,
         color: theme.textPrimary,
     },
+
+    addStopButton: {
+        width: "47%",
+        alignItems: "center",
+        paddingVertical: 8,
+        paddingHorizontal: 8,
+        borderRadius: 10,
+        backgroundColor: theme.accentSoft,
+        borderWidth: 1,
+        borderColor: theme.borderLight,
+    },
+    buttonText: {fontSize: 18, color: theme.textPrimary},
 
     modeRow: {
         flexDirection: "row",
