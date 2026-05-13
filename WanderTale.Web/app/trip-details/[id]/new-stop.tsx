@@ -11,6 +11,7 @@ import {InlineLabelSelect} from "@/components/inline-label-select";
 import {createStop} from "@/api/stops";
 import {useTheme} from "@/context/ThemeContext";
 import {TravelModeKey} from "@/types/travelMode";
+import {Stop} from "@/types/stop";
 
 export default function NewStopScreen() {
     const {theme} = useTheme();
@@ -36,7 +37,12 @@ export default function NewStopScreen() {
             endDate: endDate ? endDate.toISOString() : null,
             travelModes,
         }),
-        onSuccess: async () => {
+        onSuccess: async (createdStop) => {
+            queryClient.setQueryData<Stop[]>(["stops", tripId], (current = []) => {
+                const withoutDuplicate = current.filter((stop) => stop.id !== createdStop.id);
+                return [...withoutDuplicate, createdStop].sort((a, b) => a.orderIndex - b.orderIndex);
+            });
+
             await queryClient.invalidateQueries({queryKey: ["stops", tripId]});
             router.back();
         },

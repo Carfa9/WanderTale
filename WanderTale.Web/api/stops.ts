@@ -1,22 +1,51 @@
 import {api_url} from "@/api/config";
+import {enqueueSyncOperation} from "@/local/sync-queue";
+import {processPendingSyncQueue} from "@/local/sync-engine";
+import {
+    getLocalStopsByTripId,
+    insertLocalStop,
+    upsertStopsFromServer,
+} from "@/local/stops-repo";
 import {CreateStopDto, Stop} from "@/types/stop";
 
-export async function getStopsByTripId(tripId: string): Promise<Stop[]> {
-    const response = await fetch(`${api_url}/trips/${tripId}/stops`);
-    const text = await response.text();
+async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 4000): Promise<Response> {
+    return Promise.race([
+        fetch(url, options),
+        new Promise<Response>((_, reject) =>
+            setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs)
+        ),
+    ]);
+}
 
-    if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
-    return text ? JSON.parse(text) : [];
+export async function getStopsByTripId(tripId: string): Promise<Stop[]> {
+    const localStops = await getLocalStopsByTripId(tripId);
+    processPendingSyncQueue().catch((error) => {
+        console.log("Stop sync failed in background:", error);
+    });
+
+    try {
+        const response = await fetchWithTimeout(`${api_url}/trips/${tripId}/stops`);
+        const text = await response.text();
+
+        if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+
+        const serverStops: Stop[] = text ? JSON.parse(text) : [];
+        await upsertStopsFromServer(tripId, serverStops);
+
+        return await getLocalStopsByTripId(tripId);
+    } catch (error) {
+        console.log("Using local stops because API failed:", error);
+        return localStops;
+    }
 }
 
 export async function createStop(tripId: string, dto: CreateStopDto): Promise<Stop> {
-    const response = await fetch(`${api_url}/trips/${tripId}/stops`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(dto),
-    });
-    const text = await response.text();
+    const localStop = await insertLocalStop(tripId, dto);
+    await enqueueSyncOperation("stop", localStop.id, "create", dto);
 
-    if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
-    return text ? JSON.parse(text) : (null as any);
+    processPendingSyncQueue().catch((error) => {
+        console.log("Stop saved locally, sync later:", error);
+    });
+
+    return localStop;
 }

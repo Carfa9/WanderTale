@@ -63,7 +63,20 @@ app.UseSwagger();
 app.UseSwaggerUI(c => { c.SwaggerEndpoint("/swagger/v1/swagger.json", "WanderTale API v1"); });
 
 app.MapGet("/trips", async (AppDbContext db) =>
-    await db.Trips.ToListAsync());
+    await db.Trips
+        .Include(t => t.TravelModes)
+        .OrderBy(t => t.StartDate ?? t.CreatedAt)
+        .Select(t => new
+        {
+            t.Id,
+            t.Title,
+            t.Destination,
+            t.StartDate,
+            t.EndDate,
+            t.Description,
+            TravelModes = t.TravelModes.Select(x => x.Mode).ToList()
+        })
+        .ToListAsync());
 
 
 
