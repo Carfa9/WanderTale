@@ -1,31 +1,42 @@
-﻿import {Entry} from "@/types/entry";
-import {CreateEntryDto} from "@/dto/createEntryDto";
 import {api_url} from "@/api/config";
+import {CreateEntryDto} from "@/dto/createEntryDto";
+import {
+    getLocalEntriesByTripId,
+    insertLocalEntry,
+    upsertEntriesFromServer,
+} from "@/local/entries-repo";
+import {enqueueSyncOperation} from "@/local/sync-queue";
+import {processPendingSyncQueue} from "@/local/sync-engine";
+import {Entry} from "@/types/entry";
 
 export async function getEntries(tripId: string): Promise<Entry[]> {
-    const response = await fetch(`${api_url}/trips/${tripId}/entries`);
-    const text = await response.text();
-    if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
-    return text ? JSON.parse(text) : [];
+    const localEntries = await getLocalEntriesByTripId(tripId);
+    processPendingSyncQueue().catch((error) => {
+        console.log("Entry sync failed in background:", error);
+    });
+
+    try {
+        const response = await fetch(`${api_url}/trips/${tripId}/entries`);
+        const text = await response.text();
+        if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+
+        const serverEntries: Entry[] = text ? JSON.parse(text) : [];
+        await upsertEntriesFromServer(tripId, serverEntries);
+
+        return await getLocalEntriesByTripId(tripId);
+    } catch (error) {
+        console.log("Using local entries because API failed:", error);
+        return localEntries;
+    }
 }
 
 export async function createEntry(tripId: string, dto: CreateEntryDto): Promise<Entry> {
-    const url = `${api_url}/trips/${tripId}/entries`;
-    const body = JSON.stringify(dto);
+    const localEntry = await insertLocalEntry(tripId, dto);
+    await enqueueSyncOperation("entry", localEntry.id, "create", dto);
 
-    console.log("POST url:", url);
-    console.log("POST body:", body);
-
-    const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
+    processPendingSyncQueue().catch((error) => {
+        console.log("Entry saved locally, sync later:", error);
     });
 
-    const text = await response.text();
-    console.log("POST status:", response.status);
-    console.log("POST response:", text);
-
-    if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
-    return text ? JSON.parse(text) : (null as any);
+    return localEntry;
 }

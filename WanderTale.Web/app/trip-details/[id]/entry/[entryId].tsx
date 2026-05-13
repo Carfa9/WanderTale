@@ -7,8 +7,7 @@ import {Image} from "expo-image";
 import Carousel from "react-native-reanimated-carousel";
 import {AppText} from "@/components/app-text";
 import {getEntries} from "@/api/entries";
-import {getPhotos} from "@/api/photo";
-import {api_url} from "@/api/config";
+import {getPhotos, resolvePhotoImageUri} from "@/api/photo";
 import {FormatDate} from "@/components/format-date";
 import {Photo} from "@/types/photo";
 import {useTheme} from "@/context/ThemeContext";
@@ -89,7 +88,7 @@ export default function EntryDetailScreen() {
                                     <View style={styles.slide}>
                                         <View style={styles.polaroid}>
                                             <Image
-                                                source={`${api_url}${item.imageUri}`}
+                                                source={resolvePhotoImageUri(item.imageUri)}
                                                 style={styles.photo}
                                                 contentFit="cover"
                                             />

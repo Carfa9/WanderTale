@@ -7,6 +7,7 @@ import NewEntryForm from "@/components/new-entry-form";
 import { useLocalSearchParams, router } from "expo-router";
 import { CreateEntryDto } from "@/dto/createEntryDto";
 import {useTheme} from "@/context/ThemeContext";
+import {Entry} from "@/types/entry";
 
 export default function NewEntry() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -17,9 +18,14 @@ export default function NewEntry() {
 
     const createEntryMutation = useMutation({
         mutationFn: (dto: CreateEntryDto) => createEntry(tripId, dto),
-        onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ["entries", tripId] });
+        onSuccess: (createdEntry) => {
+            queryClient.setQueryData<Entry[]>(["entries", tripId], (current = []) => {
+                const withoutDuplicate = current.filter((entry) => entry.id !== createdEntry.id);
+                return [createdEntry, ...withoutDuplicate];
+            });
+
             router.back();
+            queryClient.invalidateQueries({ queryKey: ["entries", tripId] });
         },
         onError: (err) => {
             console.log("CREATE ERROR:", err);
