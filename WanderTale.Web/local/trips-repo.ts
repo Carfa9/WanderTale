@@ -47,11 +47,11 @@ export async function getLocalTrips(): Promise<Trip[]> {
         ORDER BY COALESCE(start_date, created_at) ASC
     `);
 
-    const trips = await Promise.all(
-        rows.map(async (row) => tripFromRow(row, await getLocalTripTravelModes(row.local_id)))
+    return Promise.all(
+        rows.map(async row =>
+            tripFromRow(row, await getLocalTripTravelModes(row.local_id))
+        )
     );
-
-    return trips;
 }
 
 export async function getLocalTripById(id: string): Promise<Trip | null> {
@@ -66,6 +66,31 @@ export async function getLocalTripById(id: string): Promise<Trip | null> {
 
     if (!row) return null;
     return tripFromRow(row, await getLocalTripTravelModes(row.local_id));
+}
+
+export async function getTripLocalId(id: string): Promise<string | null> {
+    const db = await getDB();
+    const row = await db.getFirstAsync<{local_id: string}>(`
+        SELECT local_id
+        FROM trips
+        WHERE deleted_at IS NULL
+          AND (local_id = ? OR server_id = ?)
+        LIMIT 1
+    `, [id, id]);
+
+    return row?.local_id ?? null;
+}
+
+export async function getTripServerId(localId: string): Promise<string | null> {
+    const db = await getDB();
+    const row = await db.getFirstAsync<{server_id: string | null}>(`
+        SELECT server_id
+        FROM trips
+        WHERE local_id = ?
+        LIMIT 1
+    `, [localId]);
+
+    return row?.server_id ?? null;
 }
 
 export async function insertLocalTrip(dto: CreateTripDto): Promise<Trip> {
@@ -103,6 +128,38 @@ export async function insertLocalTrip(dto: CreateTripDto): Promise<Trip> {
         description: dto.description ?? null,
         travelModes: dto.travelModes ?? [],
     };
+}
+
+export async function markLocalTripSynced(localId: string, serverTrip: Trip): Promise<void> {
+    const db = await getDB();
+    const timestamp = nowIso();
+
+    await db.withTransactionAsync(async () => {
+        await db.runAsync(`
+            UPDATE trips
+            SET server_id = ?,
+                title = ?,
+                destination = ?,
+                start_date = ?,
+                end_date = ?,
+                description = ?,
+                sync_status = 'synced',
+                updated_at = ?,
+                deleted_at = NULL
+            WHERE local_id = ?
+        `, [
+            serverTrip.id,
+            serverTrip.title,
+            serverTrip.destination ?? null,
+            serverTrip.startDate ?? null,
+            serverTrip.endDate ?? null,
+            serverTrip.description ?? null,
+            timestamp,
+            localId,
+        ]);
+
+        await replaceTripTravelModes(localId, serverTrip.travelModes ?? [], "synced");
+    });
 }
 
 export async function upsertTripFromServer(trip: Trip): Promise<void> {
