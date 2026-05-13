@@ -6,8 +6,7 @@ import {getTripById} from "@/api/trips";
 import {SafeAreaView} from "react-native-safe-area-context";
 import {AppText} from "@/components/app-text";
 import MemoryCarousel from "@/components/image-carousel";
-import {api_url} from "@/api/config";
-import {getPhotos} from "@/api/photo";
+import {getPhotos, resolvePhotoImageUri} from "@/api/photo";
 import {getEntries} from "@/api/entries";
 import {Entry} from "@/types/entry";
 import {FormatDate} from "@/components/format-date";
@@ -39,7 +38,7 @@ export default function MemoriesScreen() {
         enabled: !!tripId,
     });
 
-    const images = photos.map((photo) => `${api_url}${photo.imageUri}`);
+    const images = photos.map((photo) => resolvePhotoImageUri(photo.imageUri));
 
     return (
         <SafeAreaView style={styles.screen}>

@@ -19,9 +19,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { AppText } from "@/components/app-text";
 import { getTripById } from "@/api/trips";
-import { deletePhoto, getPhotos, updatePhotoCaption } from "@/api/photo";
+import { deletePhoto, getPhotos, resolvePhotoImageUri, updatePhotoCaption } from "@/api/photo";
 import { Photo } from "@/types/photo";
-import { api_url } from "@/api/config";
 import { FormatDate } from "@/components/format-date";
 import {useTheme} from "@/context/ThemeContext";
 
@@ -218,7 +217,7 @@ export default function AlbumScreen() {
                         <Pressable style={styles.cell} onPress={() => openOverlay(index)}>
                             <View style={styles.thumbPolaroid}>
                                 <Image
-                                    source={`${api_url}${photo.imageUri}`}
+                                    source={resolvePhotoImageUri(photo.imageUri)}
                                     style={styles.thumbPhoto}
                                     contentFit="cover"
                                 />
@@ -271,7 +270,7 @@ export default function AlbumScreen() {
                                 <>
                                     <View style={styles.overlayPolaroid}>
                                         <Image
-                                            source={`${api_url}${currentPhoto.imageUri}`}
+                                            source={resolvePhotoImageUri(currentPhoto.imageUri)}
                                             style={styles.overlayPhoto}
                                             contentFit="cover"
                                         />

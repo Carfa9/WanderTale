@@ -1,50 +1,105 @@
-﻿import {api_url} from "@/api/config";
+import {api_url} from "@/api/config";
+import {
+    getLocalPhotosByTripId,
+    getPhotoLocalId,
+    getPhotoServerId,
+    insertLocalPhoto,
+    markLocalPhotoDeleted,
+    photoInputFromFormData,
+    updateLocalPhotoCaption,
+    upsertPhotosFromServer,
+} from "@/local/photos-repo";
+import {enqueueSyncOperation} from "@/local/sync-queue";
+import {processPendingSyncQueue} from "@/local/sync-engine";
 import {Photo} from "@/types/photo";
 
-export async function createPhoto(tripId: string, formData: FormData): Promise<Photo> {
-    const url = `${api_url}/trips/${tripId}/photos`;
-   
+export function resolvePhotoImageUri(imageUri: string): string {
+    if (/^(https?:|file:|content:|data:|blob:)/.test(imageUri)) {
+        return imageUri;
+    }
 
-    const response = await fetch(url, {
-        method: "POST",
-        body: formData,
+    return `${api_url}${imageUri}`;
+}
+
+export async function createPhoto(tripId: string, formData: FormData): Promise<Photo> {
+    const photoInput = photoInputFromFormData(formData);
+    const localPhoto = await insertLocalPhoto(tripId, photoInput);
+    await enqueueSyncOperation("photo", localPhoto.id, "create", photoInput);
+
+    processPendingSyncQueue().catch((error) => {
+        console.log("Photo saved locally, sync later:", error);
     });
 
-    const text = await response.text();
-    
-    console.log("POST status:", response.status);
-    console.log("POST response:", text);
-
-    if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
-    return text ? JSON.parse(text) : (null as any);
+    return localPhoto;
 }
 
 export async function deletePhoto(photoId: string): Promise<void> {
-    const response = await fetch(`${api_url}/photos/${photoId}`, { method: "DELETE" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const photoLocalId = await getPhotoLocalId(photoId);
+    const photoServerId = photoLocalId ? await getPhotoServerId(photoLocalId) : photoId;
+
+    await markLocalPhotoDeleted(photoId);
+
+    if (!photoServerId) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${api_url}/photos/${photoServerId}`, {method: "DELETE"});
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    } catch (error) {
+        if (photoLocalId) {
+            await enqueueSyncOperation("photo", photoLocalId, "delete", {});
+        }
+        console.log("Photo deleted locally, remote delete failed:", error);
+    }
 }
 
 export async function updatePhotoCaption(photoId: string, caption: string | null): Promise<void> {
-    const response = await fetch(`${api_url}/photos/${photoId}/caption`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caption }),
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const photoLocalId = await getPhotoLocalId(photoId);
+    const photoServerId = photoLocalId ? await getPhotoServerId(photoLocalId) : photoId;
+
+    await updateLocalPhotoCaption(photoId, caption);
+
+    if (!photoServerId) {
+        if (photoLocalId) {
+            await enqueueSyncOperation("photo", photoLocalId, "updateCaption", {caption});
+        }
+        return;
+    }
+
+    try {
+        const response = await fetch(`${api_url}/photos/${photoServerId}/caption`, {
+            method: "PATCH",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({caption}),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    } catch (error) {
+        if (photoLocalId) {
+            await enqueueSyncOperation("photo", photoLocalId, "updateCaption", {caption});
+        }
+        console.log("Photo caption updated locally, remote update failed:", error);
+    }
 }
 
 export async function getPhotos(tripId: string): Promise<Photo[]> {
-    const url = `${api_url}/trips/${tripId}/photos`;
-    console.log("GET PHOTOS url:", url);
+    const localPhotos = await getLocalPhotosByTripId(tripId);
+    processPendingSyncQueue().catch((error) => {
+        console.log("Photo sync failed in background:", error);
+    });
 
-    const response = await fetch(url);
-    
-    const text = await response.text();
+    try {
+        const response = await fetch(`${api_url}/trips/${tripId}/photos`);
+        const text = await response.text();
 
-    console.log("GET PHOTOS status:", response.status);
-    console.log("GET PHOTOS response:", text);
-    
-    if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
-    
-    return text ? JSON.parse(text) : [];
+        if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+
+        const serverPhotos: Photo[] = text ? JSON.parse(text) : [];
+        await upsertPhotosFromServer(tripId, serverPhotos);
+
+        return await getLocalPhotosByTripId(tripId);
+    } catch (error) {
+        console.log("Using local photos because API failed:", error);
+        return localPhotos;
+    }
 }
