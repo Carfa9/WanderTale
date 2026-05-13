@@ -11,8 +11,8 @@ import DateInput from "@/components/date-input";
 import {TravelModeKey, travelModeKeys} from "@/types/travelMode";
 import {createTrip} from "@/api/trips";
 import {CreateTripDto} from "@/types/trip";
-import {transportOptionList} from "@/components/transport-options";
 import {useTheme} from "@/context/ThemeContext";
+import {useQueryClient} from "@tanstack/react-query";
 
 const schema = z
     .object({
@@ -43,6 +43,7 @@ type FormData = z.infer<typeof schema>;
 export default function NewTripForm() {
     const {theme} = useTheme();
     const styles = createStyles(theme.tokens);
+    const queryClient = useQueryClient();
 
     
     const form = useForm<FormData>({
@@ -65,7 +66,7 @@ export default function NewTripForm() {
         setValue,
         setError,
         clearErrors,
-        formState: { errors },
+        formState: { errors, isSubmitting },
     } = form;
 
     const [modeOpen, setModeOpen] = React.useState(false);
@@ -81,6 +82,7 @@ export default function NewTripForm() {
             };
             const created = await createTrip(dto);
             console.log("CREATED", created);
+            await queryClient.invalidateQueries({queryKey: ["trips"]});
             form.reset();
         } catch (e) {
             console.log("CREATE TRIP ERROR", e);
@@ -181,8 +183,7 @@ export default function NewTripForm() {
                 name="travelModes"
                 render={({field: { onChange, value } }) => {
                   const selected = value ?? [];
-                  
-                  const selectedLabels = selected.map((key) => transportOptionList.find((o) => o.key === key)?.label ?? key);
+
                     return (
                         <>
                             <InlineLabelSelect
@@ -231,12 +232,13 @@ export default function NewTripForm() {
             {!!errors.description?.message && (
                 <Text style={styles.error}>{errors.description.message}</Text>
             )}
-            <Pressable style={styles.submitButton} onPress={handleSubmit((data) => {
-                onSubmit(data);
-                form.reset();
-            })}>
+            <Pressable
+                style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+                disabled={isSubmitting}
+                onPress={handleSubmit(onSubmit)}
+            >
             <AppText style={styles.submit}>
-                Skapa resa
+                {isSubmitting ? "Sparar..." : "Skapa resa"}
             </AppText>
             </Pressable>
         </View>
@@ -286,4 +288,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => 
         backgroundColor: theme.accentSoft,
         borderWidth: 1,
         borderColor: theme.borderLight,},
+    submitButtonDisabled: {
+        opacity: 0.55,
+    },
 });
