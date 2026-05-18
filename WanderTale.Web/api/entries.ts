@@ -1,4 +1,4 @@
-import {api_url} from "@/api/config";
+import {apiFetch} from "@/api/http";
 import {CreateEntryDto} from "@/dto/createEntryDto";
 import {
     getLocalEntriesByTripId,
@@ -11,50 +11,42 @@ import {
 } from "@/local/entries-repo";
 import {enqueueSyncOperation} from "@/local/sync-queue";
 import {processPendingSyncQueue} from "@/local/sync-engine";
+import {getTripLocalId, getTripServerId} from "@/local/trips-repo";
 import {Entry} from "@/types/entry";
 
-async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 4000): Promise<Response> {
-    return Promise.race([
-        fetch(url, options),
-        new Promise<Response>((_, reject) =>
-            setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs)
-        ),
-    ]);
+async function getServerTripIdForFetch(tripId: string): Promise<string | null> {
+    const localId = await getTripLocalId(tripId);
+    if (!localId) return tripId;
+
+    return getTripServerId(localId);
 }
 
 export async function getEntries(tripId: string): Promise<Entry[]> {
     const localEntries = await getLocalEntriesByTripId(tripId);
-    processPendingSyncQueue().catch((error) => {
-        console.log("Entry sync failed in background:", error);
-    });
+    processPendingSyncQueue().catch(() => {});
+
+    const serverTripId = await getServerTripIdForFetch(tripId);
 
     if (localEntries.length > 0) {
-        fetchWithTimeout(`${api_url}/trips/${tripId}/entries`)
-            .then(async (response) => {
-                const text = await response.text();
-                if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
-
-                const serverEntries: Entry[] = text ? JSON.parse(text) : [];
-                await upsertEntriesFromServer(tripId, serverEntries);
-            })
-            .catch((error) => {
-                console.log("Using local entries because API failed:", error);
-            });
+        if (serverTripId) {
+            apiFetch<Entry[]>(`/trips/${serverTripId}/entries`)
+                .then(async (serverEntries) => {
+                    await upsertEntriesFromServer(tripId, serverEntries);
+                })
+                .catch(() => {});
+        }
 
         return localEntries;
     }
 
-    try {
-        const response = await fetchWithTimeout(`${api_url}/trips/${tripId}/entries`);
-        const text = await response.text();
-        if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+    if (!serverTripId) return localEntries;
 
-        const serverEntries: Entry[] = text ? JSON.parse(text) : [];
+    try {
+        const serverEntries = await apiFetch<Entry[]>(`/trips/${serverTripId}/entries`);
         await upsertEntriesFromServer(tripId, serverEntries);
 
         return await getLocalEntriesByTripId(tripId);
-    } catch (error) {
-        console.log("Using local entries because API failed:", error);
+    } catch {
         return localEntries;
     }
 }
@@ -63,9 +55,7 @@ export async function createEntry(tripId: string, dto: CreateEntryDto): Promise<
     const localEntry = await insertLocalEntry(tripId, dto);
     await enqueueSyncOperation("entry", localEntry.id, "create", dto);
 
-    processPendingSyncQueue().catch((error) => {
-        console.log("Entry saved locally, sync later:", error);
-    });
+    processPendingSyncQueue().catch(() => {});
 
     return localEntry;
 }
@@ -78,9 +68,7 @@ export async function updateEntry(id: string, dto: CreateEntryDto): Promise<Entr
         await enqueueSyncOperation("entry", localId, "update", dto);
     }
 
-    processPendingSyncQueue().catch((error) => {
-        console.log("Entry updated locally, sync later:", error);
-    });
+    processPendingSyncQueue().catch(() => {});
 
     return localEntry;
 }
@@ -96,7 +84,5 @@ export async function deleteEntry(id: string): Promise<void> {
         await enqueueSyncOperation("entry", localId, "delete", {});
     }
 
-    processPendingSyncQueue().catch((error) => {
-        console.log("Entry deleted locally, sync later:", error);
-    });
+    processPendingSyncQueue().catch(() => {});
 }

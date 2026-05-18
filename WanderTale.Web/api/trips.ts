@@ -1,4 +1,4 @@
-import {api_url} from "@/api/config";
+import {apiFetch} from "@/api/http";
 import {enqueueSyncOperation} from "@/local/sync-queue";
 import {processPendingSyncQueue} from "@/local/sync-engine";
 import {
@@ -13,35 +13,16 @@ import {
 } from "@/local/trips-repo";
 import {CreateTripDto, Trip} from "@/types/trip";
 
-async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 4000): Promise<Response> {
-    return Promise.race([
-        fetch(url, options),
-        new Promise<Response>((_, reject) =>
-            setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs)
-        ),
-    ]);
-}
-
 export async function getTrips(): Promise<Trip[]> {
     const localTrips = await getLocalTrips();
-    processPendingSyncQueue().catch((error) => {
-        console.log("Trip sync failed in background:", error);
-    });
+    processPendingSyncQueue().catch(() => {});
 
     try {
-        const response = await fetchWithTimeout(`${api_url}/trips`);
-        const text = await response.text();
-
-        if (!response.ok) {
-            throw new Error(text || `HTTP ${response.status}`);
-        }
-
-        const serverTrips: Trip[] = text ? JSON.parse(text) : [];
+        const serverTrips = await apiFetch<Trip[]>("/trips");
         await upsertTripsFromServer(serverTrips);
 
         return await getLocalTrips();
-    } catch (error) {
-        console.log("Using local trips because API failed:", error);
+    } catch {
         return localTrips;
     }
 }
@@ -50,43 +31,31 @@ export async function getTripById(id: string): Promise<Trip> {
     const localTrip = await getLocalTripById(id);
 
     if (localTrip) {
-        fetchWithTimeout(`${api_url}/trips/${id}`)
-            .then(async (response) => {
-                const text = await response.text();
-                if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+        const localId = await getTripLocalId(id);
+        const serverId = localId ? await getTripServerId(localId) : null;
 
-                const serverTrip: Trip = JSON.parse(text);
-                await upsertTripsFromServer([serverTrip]);
-            })
-            .catch((error) => {
-                console.log("Using local trip because API failed:", error);
-            });
+        if (serverId) {
+            apiFetch<Trip>(`/trips/${serverId}`)
+                .then(async (serverTrip) => {
+                    await upsertTripsFromServer([serverTrip]);
+                })
+                .catch(() => {});
+        }
 
         return localTrip;
     }
 
-    try {
-        const response = await fetchWithTimeout(`${api_url}/trips/${id}`);
-        const text = await response.text();
+    const serverTrip = await apiFetch<Trip>(`/trips/${id}`);
+    await upsertTripsFromServer([serverTrip]);
 
-        if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
-
-        const serverTrip: Trip = JSON.parse(text);
-        await upsertTripsFromServer([serverTrip]);
-
-        return serverTrip;
-    } catch (error) {
-        throw error;
-    }
+    return serverTrip;
 }
 
 export async function createTrip(dto: CreateTripDto): Promise<Trip> {
     const localTrip = await insertLocalTrip(dto);
     await enqueueSyncOperation("trip", localTrip.id, "create", dto);
 
-    processPendingSyncQueue().catch((error) => {
-        console.log("Trip saved locally, sync later:", error);
-    });
+    processPendingSyncQueue().catch(() => {});
 
     return localTrip;
 }
@@ -99,9 +68,7 @@ export async function updateTrip(id: string, dto: CreateTripDto): Promise<Trip> 
         await enqueueSyncOperation("trip", localId, "update", dto);
     }
 
-    processPendingSyncQueue().catch((error) => {
-        console.log("Trip updated locally, sync later:", error);
-    });
+    processPendingSyncQueue().catch(() => {});
 
     return localTrip;
 }
@@ -117,7 +84,5 @@ export async function deleteTrip(id: string): Promise<void> {
         await enqueueSyncOperation("trip", localId, "delete", {});
     }
 
-    processPendingSyncQueue().catch((error) => {
-        console.log("Trip deleted locally, sync later:", error);
-    });
+    processPendingSyncQueue().catch(() => {});
 }
