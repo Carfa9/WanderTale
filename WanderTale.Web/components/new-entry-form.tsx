@@ -28,7 +28,7 @@ export default function NewEntryForm({ onSubmit, isSaving, errorMessage }: Props
     const styles = createStyles(theme.tokens);
 
     const form = useForm<FormData>({
-        resolver: zodResolver(schema) as any,
+        resolver: zodResolver(schema),
         defaultValues: {
             entryDate: null,
             title: "",

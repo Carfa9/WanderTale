@@ -78,11 +78,9 @@ public static class StopEndpoints
                     TravelModes = stop.TravelModes.Select(x => x.Mode)
                 });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine("POST /stops failed:");
-                Console.WriteLine(ex.ToString());
-                return Results.Problem(ex.ToString());
+                return Results.Problem("Could not create stop.");
             }
         });
     }

@@ -1,5 +1,5 @@
 import React from "react";
-import {Keyboard, StyleSheet, TextInput, TextInputProps, View} from "react-native";
+import {Keyboard, StyleProp, StyleSheet, TextInput, TextInputProps, TextStyle, View} from "react-native";
 import {AppText} from "@/components/app-text";
 import {useTheme} from "@/context/ThemeContext";
 
@@ -9,7 +9,7 @@ type Props = {
     onChangeText: (text: string) => void;
     onBlur?: () => void;
     placeholder?: string;
-    inputStyles?: any;
+    inputStyles?: StyleProp<TextStyle>;
     inputProps?: Omit<TextInputProps, "value" | "onChangeText" | "onBlur">;
 };
 

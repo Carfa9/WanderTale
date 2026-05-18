@@ -9,6 +9,5 @@ export async function convertToJpg(uri: string) {
         format: SaveFormat.JPEG,
     });
 
-    console.log("Converted image:", result.uri);
     return result.uri;
 }

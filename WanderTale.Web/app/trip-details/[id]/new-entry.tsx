@@ -27,9 +27,6 @@ export default function NewEntry() {
             router.back();
             queryClient.invalidateQueries({ queryKey: ["entries", tripId] });
         },
-        onError: (err) => {
-            console.log("CREATE ERROR:", err);
-        },
     });
 
     return (

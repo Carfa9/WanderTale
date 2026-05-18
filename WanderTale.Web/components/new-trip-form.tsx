@@ -47,7 +47,7 @@ export default function NewTripForm() {
 
     
     const form = useForm<FormData>({
-        resolver: zodResolver(schema) as any,
+        resolver: zodResolver(schema),
         defaultValues: {
             title: "",
             destination: "",
@@ -74,18 +74,15 @@ export default function NewTripForm() {
 
     const onSubmit = async (data: FormData) => {
         try {
-            console.log("SUBMIT", data);
             const dto: CreateTripDto = {
                 ...data,
                 destination: data.destination ?? null,
                 description: data.description ?? null,
             };
-            const created = await createTrip(dto);
-            console.log("CREATED", created);
+            await createTrip(dto);
             await queryClient.invalidateQueries({queryKey: ["trips"]});
             form.reset();
-        } catch (e) {
-            console.log("CREATE TRIP ERROR", e);
+        } catch {
         }        
     };
 

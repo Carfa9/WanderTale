@@ -37,22 +37,6 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var conn = db.Database.GetDbConnection();
-
-    var tables = await db.Database
-        .SqlQueryRaw<string>("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;")
-        .ToListAsync();
-
-    app.Logger.LogInformation("Tables: {Tables}", string.Join(", ", tables));
-
-    app.Logger.LogInformation("DB file: {Db}", conn.DataSource);
-    app.Logger.LogInformation("CWD: {Cwd}", Directory.GetCurrentDirectory());
-}
-
-
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 }
 

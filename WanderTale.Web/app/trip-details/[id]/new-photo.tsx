@@ -25,6 +25,12 @@ import {FormatDate} from "@/components/format-date";
 import {useTheme} from "@/context/ThemeContext";
 import {Ionicons} from "@expo/vector-icons";
 
+type ReactNativeFormDataFile = {
+    uri: string;
+    name: string;
+    type: string;
+};
+
 export default function NewPhoto() {
     const {theme} = useTheme();
     const styles = createStyles(theme.tokens);
@@ -69,7 +75,12 @@ export default function NewPhoto() {
                 if (location.trim()) formData.append("location", location.trim());
                 if (photoDate) formData.append("photoDate", photoDate.toISOString());
                 if (entryId) formData.append("entryId", entryId);
-                formData.append("image", {uri: jpgUri, name: `photo-${Date.now()}.jpg`, type: "image/jpeg"} as any);
+                const image: ReactNativeFormDataFile = {
+                    uri: jpgUri,
+                    name: `photo-${Date.now()}.jpg`,
+                    type: "image/jpeg",
+                };
+                formData.append("image", image as unknown as Blob);
                 await createPhotoMutation.mutateAsync(formData);
             }
             router.back();

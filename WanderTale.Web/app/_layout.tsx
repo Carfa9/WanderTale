@@ -26,9 +26,7 @@ export default function RootLayout() {
         let isMounted = true;
 
         initializeLocalSchema()
-            .catch((error) => {
-                console.log("Failed to initialize local database:", error);
-            })
+            .catch(() => {})
             .finally(() => {
                 if (isMounted) setLocalDbReady(true);
             });

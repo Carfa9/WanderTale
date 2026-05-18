@@ -1,12 +1,12 @@
 ﻿import React from "react";
-import {Pressable, StyleSheet, View} from "react-native";
+import {Pressable, StyleProp, StyleSheet, TextStyle, View} from "react-native";
 import {AppText} from "@/components/app-text";
 import {Ionicons} from "@expo/vector-icons";
 
 type Props = {
     text: string;
     collapsedLines?: number;
-    textStyle?: any;
+    textStyle?: StyleProp<TextStyle>;
 };
 
 export function ExpandableText({text, collapsedLines = 3, textStyle}: Props) {

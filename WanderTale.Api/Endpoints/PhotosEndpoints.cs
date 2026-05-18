@@ -68,12 +68,6 @@ public static class PhotosEndpoints
                 var location = form["location"].ToString();
                 var entryIdValue = form["entryId"].ToString();
 
-                Console.WriteLine($"WebRootPath: {env.WebRootPath}");
-                Console.WriteLine($"ContentRootPath: {env.ContentRootPath}");
-                Console.WriteLine($"File null? {file is null}");
-                Console.WriteLine($"File length: {file?.Length}");
-                Console.WriteLine($"File name: {file?.FileName}");
-
                 if (file is null || file.Length == 0)
                     return Results.BadRequest("Ingen bild skickades");
 

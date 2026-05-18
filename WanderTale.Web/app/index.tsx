@@ -1,4 +1,4 @@
-import {View, Text, ImageBackground, Pressable, StyleSheet, FlatList, Button} from "react-native";
+import {View, Text, ImageBackground, Pressable, StyleSheet, FlatList} from "react-native";
 import {useQuery} from "@tanstack/react-query";
 import {getTrips} from "@/api/trips";
 import {SafeAreaView} from "react-native-safe-area-context";
@@ -21,10 +21,8 @@ export default function Index() {
     });
 
     const [active, setActive] = useState<"upcoming" | "done">("upcoming");
-    const trips = data ?? [];
-    console.log("Trips:", trips);
-
     const visibleTrips = useMemo(() => {
+        const trips = data ?? [];
         const today = new Date();
 
         const upcoming = trips.filter((t) => {
@@ -50,7 +48,7 @@ export default function Index() {
         });
 
         return active === "upcoming" ? upcoming : done;
-    }, [trips, active]);
+    }, [data, active]);
 
     return (
         <SafeAreaView style={styles.screen}>
@@ -62,7 +60,7 @@ export default function Index() {
 
             {error && (
                 <Text style={{padding: 16}}>
-                    Error: {String((error as any)?.message ?? error)}
+                    Error: {error instanceof Error ? error.message : String(error)}
                 </Text>
             )}
             {!isLoading && !error && (

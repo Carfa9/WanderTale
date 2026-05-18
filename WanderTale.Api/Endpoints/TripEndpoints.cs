@@ -81,11 +81,9 @@ public static class TripEndpoints
                     TravelModes = trip.TravelModes.Select(x => x.Mode)
                 });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine("POST /trips failed:");
-                Console.WriteLine(ex.ToString());
-                return Results.Problem(ex.ToString());
+                return Results.Problem("Could not create trip.");
             }
         });
         
