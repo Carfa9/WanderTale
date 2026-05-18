@@ -190,6 +190,63 @@ app.MapPost("/trips", async (AppDbContext db, CreateTripRequest request) =>
         return Results.Problem(ex.ToString());
     }
 });
+
+app.MapPut("/trips/{id:guid}", async (AppDbContext db, Guid id, UpdateTripRequest request) =>
+{
+    var trip = await db.Trips
+        .Include(t => t.TravelModes)
+        .FirstOrDefaultAsync(t => t.Id == id);
+
+    if (trip is null) return Results.NotFound();
+
+    trip.Title = request.Title;
+    trip.Destination = request.Destination;
+    trip.Description = request.Description;
+    trip.StartDate = request.StartDate;
+    trip.EndDate = request.EndDate;
+    trip.UpdatedAt = DateTime.UtcNow;
+
+    db.TripTravelModes.RemoveRange(trip.TravelModes);
+    trip.TravelModes = (request.TravelModes ?? [])
+        .Select(m => new TripTravelMode { TripId = trip.Id, Mode = m })
+        .ToList();
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new
+    {
+        trip.Id,
+        trip.Title,
+        trip.Destination,
+        trip.StartDate,
+        trip.EndDate,
+        trip.Description,
+        TravelModes = trip.TravelModes.Select(x => x.Mode).ToList()
+    });
+});
+
+app.MapDelete("/trips/{id:guid}", async (AppDbContext db, Guid id, IWebHostEnvironment env) =>
+{
+    var trip = await db.Trips
+        .Include(t => t.Photos)
+        .FirstOrDefaultAsync(t => t.Id == id);
+
+    if (trip is null) return Results.NotFound();
+
+    var root = string.IsNullOrWhiteSpace(env.WebRootPath)
+        ? Path.Combine(env.ContentRootPath, "wwwroot")
+        : env.WebRootPath;
+
+    foreach (var photo in trip.Photos)
+    {
+        var filePath = Path.Combine(root, photo.ImageUri.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+        if (File.Exists(filePath)) File.Delete(filePath);
+    }
+
+    db.Trips.Remove(trip);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+});
 app.MapGet("/trips/{tripId:guid}/entries", async (AppDbContext db, Guid tripId) =>
 {
     var entries = await db.Entries
@@ -248,6 +305,30 @@ app.MapPost("/trips/{tripId:guid}/entries", async (AppDbContext db, Guid tripId,
         return Results.Ok(entry);
     }
 );
+
+app.MapPut("/entries/{entryId:guid}", async (AppDbContext db, Guid entryId, UpdateEntryRequest req) =>
+{
+    var entry = await db.Entries.FindAsync(entryId);
+    if (entry is null) return Results.NotFound();
+
+    entry.EntryDate = req.EntryDate;
+    entry.Title = req.Title;
+    entry.Content = req.Content;
+    entry.UpdatedAt = DateTime.UtcNow;
+
+    await db.SaveChangesAsync();
+    return Results.Ok(new { entry.Id, entry.Title, entry.EntryDate, entry.Content });
+});
+
+app.MapDelete("/entries/{entryId:guid}", async (AppDbContext db, Guid entryId) =>
+{
+    var entry = await db.Entries.FindAsync(entryId);
+    if (entry is null) return Results.NotFound();
+
+    db.Entries.Remove(entry);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+});
 
 app.MapPost("/trips/{tripId:guid}/photos", async (AppDbContext db, Guid tripId, HttpRequest req, IWebHostEnvironment env) =>
 {
