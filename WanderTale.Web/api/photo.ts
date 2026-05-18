@@ -21,6 +21,15 @@ export function resolvePhotoImageUri(imageUri: string): string {
     return `${api_url}${imageUri}`;
 }
 
+async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 4000): Promise<Response> {
+    return Promise.race([
+        fetch(url, options),
+        new Promise<Response>((_, reject) =>
+            setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs)
+        ),
+    ]);
+}
+
 export async function createPhoto(tripId: string, formData: FormData): Promise<Photo> {
     const photoInput = photoInputFromFormData(formData);
     const localPhoto = await insertLocalPhoto(tripId, photoInput);
@@ -88,8 +97,24 @@ export async function getPhotos(tripId: string): Promise<Photo[]> {
         console.log("Photo sync failed in background:", error);
     });
 
+    if (localPhotos.length > 0) {
+        fetchWithTimeout(`${api_url}/trips/${tripId}/photos`)
+            .then(async (response) => {
+                const text = await response.text();
+                if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+
+                const serverPhotos: Photo[] = text ? JSON.parse(text) : [];
+                await upsertPhotosFromServer(tripId, serverPhotos);
+            })
+            .catch((error) => {
+                console.log("Using local photos because API failed:", error);
+            });
+
+        return localPhotos;
+    }
+
     try {
-        const response = await fetch(`${api_url}/trips/${tripId}/photos`);
+        const response = await fetchWithTimeout(`${api_url}/trips/${tripId}/photos`);
         const text = await response.text();
 
         if (!response.ok) throw new Error(text || `HTTP ${response.status}`);

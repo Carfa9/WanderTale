@@ -6,7 +6,7 @@ export default function TripDetailsLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="new-entry" />
             <Stack.Screen name="new-photo" />
-            <Stack.Screen name="album" />
+            <Stack.Screen name="album" options={{animation: "none"}} />
             <Stack.Screen name="entry/[entryId]" />
             <Stack.Screen name="stops" />
             <Stack.Screen name="new-stop" />

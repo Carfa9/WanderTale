@@ -4,7 +4,6 @@ import { Extrapolation, interpolate } from "react-native-reanimated";
 import Carousel from "react-native-reanimated-carousel";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { AppText } from "@/components/app-text";
 import {useTheme} from "@/context/ThemeContext";
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -19,9 +18,10 @@ const SIDE_OFFSET = Math.min(screenWidth * 0.27, 112);
 type Props = {
     images: string[];
     tripId: string;
+    onPhotoPress?: (index: number) => void;
 };
 
-export default function MemoryCarousel({ images, tripId }: Props) {
+export default function MemoryCarousel({ images, tripId, onPhotoPress }: Props) {
     const {theme} = useTheme();
     const styles = createStyles(theme.tokens);
 
@@ -29,7 +29,6 @@ export default function MemoryCarousel({ images, tripId }: Props) {
 
     return (
         <View style={styles.wrapper}>
-            <AppText size={18} style={styles.eyebrow}>Fotominnen</AppText>
             <Carousel
                 style={styles.carousel}
                 width={screenWidth}
@@ -69,7 +68,11 @@ export default function MemoryCarousel({ images, tripId }: Props) {
                 renderItem={({ item, index }) => (
                     <Pressable
                         style={styles.slide}
-                        onPress={() => router.push(`/trip-details/${tripId}/album?initialIndex=${index}`)}
+                        onPress={() =>
+                            onPhotoPress
+                                ? onPhotoPress(index)
+                                : router.push(`/trip-details/${tripId}/album?initialIndex=${index}`)
+                        }
                     >
                         <View style={styles.polaroid}>
                             <Image source={item} style={styles.photo} contentFit="cover" />
