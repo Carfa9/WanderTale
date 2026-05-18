@@ -4,7 +4,11 @@ import {processPendingSyncQueue} from "@/local/sync-engine";
 import {
     getLocalTripById,
     getLocalTrips,
+    getTripLocalId,
+    getTripServerId,
     insertLocalTrip,
+    markLocalTripDeleted,
+    updateLocalTrip,
     upsertTripsFromServer,
 } from "@/local/trips-repo";
 import {CreateTripDto, Trip} from "@/types/trip";
@@ -45,6 +49,22 @@ export async function getTrips(): Promise<Trip[]> {
 export async function getTripById(id: string): Promise<Trip> {
     const localTrip = await getLocalTripById(id);
 
+    if (localTrip) {
+        fetchWithTimeout(`${api_url}/trips/${id}`)
+            .then(async (response) => {
+                const text = await response.text();
+                if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+
+                const serverTrip: Trip = JSON.parse(text);
+                await upsertTripsFromServer([serverTrip]);
+            })
+            .catch((error) => {
+                console.log("Using local trip because API failed:", error);
+            });
+
+        return localTrip;
+    }
+
     try {
         const response = await fetchWithTimeout(`${api_url}/trips/${id}`);
         const text = await response.text();
@@ -56,7 +76,6 @@ export async function getTripById(id: string): Promise<Trip> {
 
         return serverTrip;
     } catch (error) {
-        if (localTrip) return localTrip;
         throw error;
     }
 }
@@ -70,4 +89,35 @@ export async function createTrip(dto: CreateTripDto): Promise<Trip> {
     });
 
     return localTrip;
+}
+
+export async function updateTrip(id: string, dto: CreateTripDto): Promise<Trip> {
+    const localTrip = await updateLocalTrip(id, dto);
+    const localId = await getTripLocalId(id);
+
+    if (localId) {
+        await enqueueSyncOperation("trip", localId, "update", dto);
+    }
+
+    processPendingSyncQueue().catch((error) => {
+        console.log("Trip updated locally, sync later:", error);
+    });
+
+    return localTrip;
+}
+
+export async function deleteTrip(id: string): Promise<void> {
+    const localId = await markLocalTripDeleted(id);
+
+    if (!localId) return;
+
+    const serverId = await getTripServerId(localId);
+
+    if (serverId) {
+        await enqueueSyncOperation("trip", localId, "delete", {});
+    }
+
+    processPendingSyncQueue().catch((error) => {
+        console.log("Trip deleted locally, sync later:", error);
+    });
 }

@@ -35,6 +35,10 @@ function createLocalId(prefix: string) {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function isLocalImageUri(uri: string | null): uri is string {
+    return !!uri && /^(file:|content:|data:|blob:)/.test(uri);
+}
+
 function stringValue(value: unknown): string | null {
     return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -69,7 +73,7 @@ function photoFromRow(row: PhotoRow): Photo {
         id: row.server_id ?? row.local_id,
         tripId: row.trip_server_id ?? row.trip_local_id,
         entryId: row.entry_server_id ?? row.entry_local_id,
-        imageUri: row.server_image_uri ?? row.image_uri,
+        imageUri: isLocalImageUri(row.image_uri) ? row.image_uri : row.server_image_uri ?? row.image_uri,
         caption: row.caption,
         photoDate: row.photo_date,
         location: row.location,

@@ -130,6 +130,69 @@ export async function insertLocalTrip(dto: CreateTripDto): Promise<Trip> {
     };
 }
 
+export async function updateLocalTrip(id: string, dto: CreateTripDto): Promise<Trip> {
+    const db = await getDB();
+    const localId = await getTripLocalId(id);
+
+    if (!localId) {
+        throw new Error(`Trip not found locally: ${id}`);
+    }
+
+    const timestamp = nowIso();
+
+    await db.withTransactionAsync(async () => {
+        await db.runAsync(`
+            UPDATE trips
+            SET title = ?,
+                destination = ?,
+                start_date = ?,
+                end_date = ?,
+                description = ?,
+                sync_status = 'pending',
+                updated_at = ?
+            WHERE local_id = ?
+        `, [
+            dto.title,
+            dto.destination ?? null,
+            dto.startDate ?? null,
+            dto.endDate ?? null,
+            dto.description ?? null,
+            timestamp,
+            localId,
+        ]);
+
+        await replaceTripTravelModes(localId, dto.travelModes ?? [], "pending");
+    });
+
+    return {
+        id,
+        title: dto.title,
+        destination: dto.destination ?? null,
+        startDate: dto.startDate ?? null,
+        endDate: dto.endDate ?? null,
+        description: dto.description ?? null,
+        travelModes: dto.travelModes ?? [],
+    };
+}
+
+export async function markLocalTripDeleted(id: string): Promise<string | null> {
+    const db = await getDB();
+    const localId = await getTripLocalId(id);
+
+    if (!localId) return null;
+
+    const timestamp = nowIso();
+    await db.runAsync(`
+        UPDATE trips
+        SET deleted_at = ?,
+            sync_status = 'pending',
+            updated_at = ?
+        WHERE local_id = ?
+    `, [timestamp, timestamp, localId]);
+
+    return localId;
+}
+
 export async function markLocalTripSynced(localId: string, serverTrip: Trip): Promise<void> {
     const db = await getDB();
     const timestamp = nowIso();

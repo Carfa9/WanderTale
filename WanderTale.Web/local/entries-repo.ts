@@ -129,6 +129,55 @@ export async function insertLocalEntry(tripId: string, dto: CreateEntryDto): Pro
     };
 }
 
+export async function updateLocalEntry(id: string, dto: CreateEntryDto): Promise<Entry> {
+    const db = await getDB();
+    const localId = await getEntryLocalId(id);
+
+    if (!localId) {
+        throw new Error(`Entry not found locally: ${id}`);
+    }
+
+    await db.runAsync(`
+        UPDATE entries
+        SET title = ?,
+            content = ?,
+            entry_date = ?,
+            sync_status = 'pending',
+            updated_at = ?
+        WHERE local_id = ?
+    `, [
+        dto.Title ?? null,
+        dto.Content ?? null,
+        dto.EntryDate ?? null,
+        nowIso(),
+        localId,
+    ]);
+
+    return {
+        id,
+        entryDate: dto.EntryDate ?? null,
+        title: dto.Title ?? null,
+        content: dto.Content ?? null,
+    };
+}
+
+export async function markLocalEntryDeleted(id: string): Promise<string | null> {
+    const db = await getDB();
+    const localId = await getEntryLocalId(id);
+
+    if (!localId) return null;
+
+    await db.runAsync(`
+        UPDATE entries
+        SET deleted_at = ?,
+            sync_status = 'pending',
+            updated_at = ?
+        WHERE local_id = ?
+    `, [nowIso(), nowIso(), localId]);
+
+    return localId;
+}
+
 export async function markLocalEntrySynced(localId: string, serverEntry: Entry): Promise<void> {
     const db = await getDB();
 
