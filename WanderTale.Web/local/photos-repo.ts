@@ -43,12 +43,19 @@ function stringValue(value: unknown): string | null {
     return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+type ReactNativeFormData = FormData & {
+    _parts?: Array<[string, unknown]>;
+    get?: (key: string) => unknown;
+};
+
 function getFormDataPart(formData: FormData, key: string): unknown {
-    if (typeof (formData as any).get === "function") {
-        return (formData as any).get(key);
+    const nativeFormData = formData as ReactNativeFormData;
+
+    if (typeof nativeFormData.get === "function") {
+        return nativeFormData.get(key);
     }
 
-    const parts = (formData as any)._parts as Array<[string, unknown]> | undefined;
+    const parts = nativeFormData._parts;
     return parts?.find(([partKey]) => partKey === key)?.[1] ?? null;
 }
 

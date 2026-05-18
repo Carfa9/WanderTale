@@ -1,10 +1,11 @@
-import {api_url} from "@/api/config";
+import {ApiError, apiFetch} from "@/api/http";
 import {getEntryServerId, getLocalEntryForSync, markLocalEntrySynced} from "@/local/entries-repo";
 import {getLocalPhotoForSync, getPhotoServerId, markLocalPhotoSynced} from "@/local/photos-repo";
 import {getLocalStopForSync, markLocalStopSynced} from "@/local/stops-repo";
 import {getLocalTripById, getTripServerId, markLocalTripSynced} from "@/local/trips-repo";
 import {CreateStopDto, Stop} from "@/types/stop";
 import {CreateEntryDto} from "@/dto/createEntryDto";
+import {Entry} from "@/types/entry";
 import {Photo} from "@/types/photo";
 import {CreateTripDto, Trip} from "@/types/trip";
 import {
@@ -17,13 +18,14 @@ import {
 
 let isProcessing = false;
 
-async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 4000): Promise<Response> {
-    return Promise.race([
-        fetch(url, options),
-        new Promise<Response>((_, reject) =>
-            setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs)
-        ),
-    ]);
+type ReactNativeFormDataFile = {
+    uri: string;
+    name: string;
+    type: string;
+};
+
+function isNotFound(error: unknown): boolean {
+    return error instanceof ApiError && error.status === 404;
 }
 
 async function syncTripCreate(item: SyncQueueItem): Promise<void> {
@@ -36,19 +38,11 @@ async function syncTripCreate(item: SyncQueueItem): Promise<void> {
     if (existingServerId) return;
 
     const dto: CreateTripDto = JSON.parse(item.payload);
-
-    const response = await fetchWithTimeout(`${api_url}/trips`, {
+    const serverTrip = await apiFetch<Trip>("/trips", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(dto),
     });
-    const text = await response.text();
-
-    if (!response.ok) {
-        throw new Error(text || `HTTP ${response.status}`);
-    }
-
-    const serverTrip: Trip = JSON.parse(text);
     await markLocalTripSynced(item.entity_local_id, serverTrip);
 }
 
@@ -60,18 +54,11 @@ async function syncTripUpdate(item: SyncQueueItem): Promise<void> {
     }
 
     const dto: CreateTripDto = JSON.parse(item.payload);
-    const response = await fetchWithTimeout(`${api_url}/trips/${tripServerId}`, {
+    const serverTrip = await apiFetch<Trip>(`/trips/${tripServerId}`, {
         method: "PUT",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(dto),
     });
-    const text = await response.text();
-
-    if (!response.ok) {
-        throw new Error(text || `HTTP ${response.status}`);
-    }
-
-    const serverTrip: Trip = JSON.parse(text);
     await markLocalTripSynced(item.entity_local_id, serverTrip);
 }
 
@@ -80,11 +67,10 @@ async function syncTripDelete(item: SyncQueueItem): Promise<void> {
 
     if (!tripServerId) return;
 
-    const response = await fetchWithTimeout(`${api_url}/trips/${tripServerId}`, {method: "DELETE"});
-
-    if (!response.ok && response.status !== 404) {
-        const text = await response.text();
-        throw new Error(text || `HTTP ${response.status}`);
+    try {
+        await apiFetch<void>(`/trips/${tripServerId}`, {method: "DELETE"});
+    } catch (error) {
+        if (!isNotFound(error)) throw error;
     }
 }
 
@@ -102,18 +88,11 @@ async function syncStopCreate(item: SyncQueueItem): Promise<void> {
     }
 
     const dto: CreateStopDto = JSON.parse(item.payload);
-    const response = await fetchWithTimeout(`${api_url}/trips/${tripServerId}/stops`, {
+    const serverStop = await apiFetch<Stop>(`/trips/${tripServerId}/stops`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(dto),
     });
-    const text = await response.text();
-
-    if (!response.ok) {
-        throw new Error(text || `HTTP ${response.status}`);
-    }
-
-    const serverStop: Stop = JSON.parse(text);
     await markLocalStopSynced(item.entity_local_id, serverStop);
 }
 
@@ -137,18 +116,11 @@ async function syncEntryCreate(item: SyncQueueItem): Promise<void> {
     }
 
     const dto: CreateEntryDto = JSON.parse(item.payload);
-    const response = await fetchWithTimeout(`${api_url}/trips/${tripServerId}/entries`, {
+    const serverEntry = await apiFetch<Entry>(`/trips/${tripServerId}/entries`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(dto),
     });
-    const text = await response.text();
-
-    if (!response.ok) {
-        throw new Error(text || `HTTP ${response.status}`);
-    }
-
-    const serverEntry = JSON.parse(text);
     await markLocalEntrySynced(item.entity_local_id, serverEntry);
 }
 
@@ -160,18 +132,11 @@ async function syncEntryUpdate(item: SyncQueueItem): Promise<void> {
     }
 
     const dto: CreateEntryDto = JSON.parse(item.payload);
-    const response = await fetchWithTimeout(`${api_url}/entries/${entryServerId}`, {
+    const serverEntry = await apiFetch<Entry>(`/entries/${entryServerId}`, {
         method: "PUT",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(dto),
     });
-    const text = await response.text();
-
-    if (!response.ok) {
-        throw new Error(text || `HTTP ${response.status}`);
-    }
-
-    const serverEntry = JSON.parse(text);
     await markLocalEntrySynced(item.entity_local_id, serverEntry);
 }
 
@@ -180,11 +145,10 @@ async function syncEntryDelete(item: SyncQueueItem): Promise<void> {
 
     if (!entryServerId) return;
 
-    const response = await fetchWithTimeout(`${api_url}/entries/${entryServerId}`, {method: "DELETE"});
-
-    if (!response.ok && response.status !== 404) {
-        const text = await response.text();
-        throw new Error(text || `HTTP ${response.status}`);
+    try {
+        await apiFetch<void>(`/entries/${entryServerId}`, {method: "DELETE"});
+    } catch (error) {
+        if (!isNotFound(error)) throw error;
     }
 }
 
@@ -214,23 +178,17 @@ async function syncPhotoCreate(item: SyncQueueItem): Promise<void> {
     if (localPhoto.photo.photoDate) formData.append("photoDate", localPhoto.photo.photoDate);
     if (localPhoto.photo.location) formData.append("location", localPhoto.photo.location);
     if (entryServerId) formData.append("entryId", entryServerId);
-    formData.append("image", {
+    const image: ReactNativeFormDataFile = {
         uri: localPhoto.photo.imageUri,
         name: `photo-${Date.now()}.jpg`,
         type: "image/jpeg",
-    } as any);
+    };
+    formData.append("image", image as unknown as Blob);
 
-    const response = await fetchWithTimeout(`${api_url}/trips/${tripServerId}/photos`, {
+    const serverPhoto = await apiFetch<Photo>(`/trips/${tripServerId}/photos`, {
         method: "POST",
         body: formData,
     });
-    const text = await response.text();
-
-    if (!response.ok) {
-        throw new Error(text || `HTTP ${response.status}`);
-    }
-
-    const serverPhoto: Photo = JSON.parse(text);
     await markLocalPhotoSynced(item.entity_local_id, serverPhoto);
 }
 
@@ -241,11 +199,10 @@ async function syncPhotoDelete(item: SyncQueueItem): Promise<void> {
         return;
     }
 
-    const response = await fetchWithTimeout(`${api_url}/photos/${photoServerId}`, {method: "DELETE"});
-
-    if (!response.ok && response.status !== 404) {
-        const text = await response.text();
-        throw new Error(text || `HTTP ${response.status}`);
+    try {
+        await apiFetch<void>(`/photos/${photoServerId}`, {method: "DELETE"});
+    } catch (error) {
+        if (!isNotFound(error)) throw error;
     }
 }
 
@@ -257,16 +214,11 @@ async function syncPhotoCaptionUpdate(item: SyncQueueItem): Promise<void> {
     }
 
     const payload = JSON.parse(item.payload) as {caption: string | null};
-    const response = await fetchWithTimeout(`${api_url}/photos/${photoServerId}/caption`, {
+    await apiFetch<void>(`/photos/${photoServerId}/caption`, {
         method: "PATCH",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({caption: payload.caption ?? null}),
     });
-
-    if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || `HTTP ${response.status}`);
-    }
 }
 
 export async function processPendingSyncQueue(): Promise<void> {
