@@ -2,7 +2,7 @@ import {api_url} from "@/api/config";
 import {getEntryServerId, getLocalEntryForSync, markLocalEntrySynced} from "@/local/entries-repo";
 import {getLocalPhotoForSync, getPhotoServerId, markLocalPhotoSynced} from "@/local/photos-repo";
 import {getLocalStopForSync, markLocalStopSynced} from "@/local/stops-repo";
-import {getTripServerId, markLocalTripSynced} from "@/local/trips-repo";
+import {getLocalTripById, getTripServerId, markLocalTripSynced} from "@/local/trips-repo";
 import {CreateStopDto, Stop} from "@/types/stop";
 import {CreateEntryDto} from "@/dto/createEntryDto";
 import {Photo} from "@/types/photo";
@@ -27,6 +27,14 @@ async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 
 }
 
 async function syncTripCreate(item: SyncQueueItem): Promise<void> {
+    const localTrip = await getLocalTripById(item.entity_local_id);
+
+    if (!localTrip) return;
+
+    const existingServerId = await getTripServerId(item.entity_local_id);
+
+    if (existingServerId) return;
+
     const dto: CreateTripDto = JSON.parse(item.payload);
 
     const response = await fetchWithTimeout(`${api_url}/trips`, {
@@ -42,6 +50,42 @@ async function syncTripCreate(item: SyncQueueItem): Promise<void> {
 
     const serverTrip: Trip = JSON.parse(text);
     await markLocalTripSynced(item.entity_local_id, serverTrip);
+}
+
+async function syncTripUpdate(item: SyncQueueItem): Promise<void> {
+    const tripServerId = await getTripServerId(item.entity_local_id);
+
+    if (!tripServerId) {
+        throw new Error(`Trip is not synced yet: ${item.entity_local_id}`);
+    }
+
+    const dto: CreateTripDto = JSON.parse(item.payload);
+    const response = await fetchWithTimeout(`${api_url}/trips/${tripServerId}`, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(dto),
+    });
+    const text = await response.text();
+
+    if (!response.ok) {
+        throw new Error(text || `HTTP ${response.status}`);
+    }
+
+    const serverTrip: Trip = JSON.parse(text);
+    await markLocalTripSynced(item.entity_local_id, serverTrip);
+}
+
+async function syncTripDelete(item: SyncQueueItem): Promise<void> {
+    const tripServerId = await getTripServerId(item.entity_local_id);
+
+    if (!tripServerId) return;
+
+    const response = await fetchWithTimeout(`${api_url}/trips/${tripServerId}`, {method: "DELETE"});
+
+    if (!response.ok && response.status !== 404) {
+        const text = await response.text();
+        throw new Error(text || `HTTP ${response.status}`);
+    }
 }
 
 async function syncStopCreate(item: SyncQueueItem): Promise<void> {
@@ -106,6 +150,42 @@ async function syncEntryCreate(item: SyncQueueItem): Promise<void> {
 
     const serverEntry = JSON.parse(text);
     await markLocalEntrySynced(item.entity_local_id, serverEntry);
+}
+
+async function syncEntryUpdate(item: SyncQueueItem): Promise<void> {
+    const entryServerId = await getEntryServerId(item.entity_local_id);
+
+    if (!entryServerId) {
+        throw new Error(`Entry is not synced yet: ${item.entity_local_id}`);
+    }
+
+    const dto: CreateEntryDto = JSON.parse(item.payload);
+    const response = await fetchWithTimeout(`${api_url}/entries/${entryServerId}`, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(dto),
+    });
+    const text = await response.text();
+
+    if (!response.ok) {
+        throw new Error(text || `HTTP ${response.status}`);
+    }
+
+    const serverEntry = JSON.parse(text);
+    await markLocalEntrySynced(item.entity_local_id, serverEntry);
+}
+
+async function syncEntryDelete(item: SyncQueueItem): Promise<void> {
+    const entryServerId = await getEntryServerId(item.entity_local_id);
+
+    if (!entryServerId) return;
+
+    const response = await fetchWithTimeout(`${api_url}/entries/${entryServerId}`, {method: "DELETE"});
+
+    if (!response.ok && response.status !== 404) {
+        const text = await response.text();
+        throw new Error(text || `HTTP ${response.status}`);
+    }
 }
 
 async function syncPhotoCreate(item: SyncQueueItem): Promise<void> {
@@ -206,6 +286,18 @@ export async function processPendingSyncQueue(): Promise<void> {
                     continue;
                 }
 
+                if (item.entity_type === "trip" && item.operation === "update") {
+                    await syncTripUpdate(item);
+                    await markSyncQueueItemSynced(item.id);
+                    continue;
+                }
+
+                if (item.entity_type === "trip" && item.operation === "delete") {
+                    await syncTripDelete(item);
+                    await markSyncQueueItemSynced(item.id);
+                    continue;
+                }
+
                 if (item.entity_type === "stop" && item.operation === "create") {
                     await syncStopCreate(item);
                     await markSyncQueueItemSynced(item.id);
@@ -214,6 +306,18 @@ export async function processPendingSyncQueue(): Promise<void> {
 
                 if (item.entity_type === "entry" && item.operation === "create") {
                     await syncEntryCreate(item);
+                    await markSyncQueueItemSynced(item.id);
+                    continue;
+                }
+
+                if (item.entity_type === "entry" && item.operation === "update") {
+                    await syncEntryUpdate(item);
+                    await markSyncQueueItemSynced(item.id);
+                    continue;
+                }
+
+                if (item.entity_type === "entry" && item.operation === "delete") {
+                    await syncEntryDelete(item);
                     await markSyncQueueItemSynced(item.id);
                     continue;
                 }

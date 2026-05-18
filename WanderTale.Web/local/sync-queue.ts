@@ -1,7 +1,7 @@
 import {getDB} from "./db";
 
 export type SyncEntityType = "trip" | "stop" | "entry" | "photo";
-export type SyncOperation = "create" | "delete" | "updateCaption";
+export type SyncOperation = "create" | "update" | "delete" | "updateCaption";
 export type SyncQueueStatus = "pending" | "processing" | "synced" | "error";
 
 export type SyncQueueItem = {
