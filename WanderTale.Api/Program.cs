@@ -54,3 +54,7 @@ app.MapEntriesEndpoints();
 app.MapThemesEndpoints();
 
 app.Run();
+
+public partial class Program
+{
+}
