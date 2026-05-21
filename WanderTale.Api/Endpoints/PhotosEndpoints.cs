@@ -70,6 +70,16 @@ public static class PhotosEndpoints
 
                 if (file is null || file.Length == 0)
                     return Results.BadRequest("Ingen bild skickades");
+                
+                const long maxFileSize = 5 * 1024 * 1024;
+
+                if (file.Length > maxFileSize)
+                    return Results.BadRequest("Bilden får max vara 5 MB");
+                
+                var allowedContentTypes = new[] { "image/jpeg", "image/png" };
+
+                if (!allowedContentTypes.Contains(file.ContentType))
+                    return Results.BadRequest("Endast JPG och PNG stöds");
 
                 Guid? entryId = null;
                 if (!string.IsNullOrWhiteSpace(entryIdValue) && Guid.TryParse(entryIdValue, out var parsedEntryId))
@@ -87,7 +97,7 @@ public static class PhotosEndpoints
                 var root = string.IsNullOrWhiteSpace(env.WebRootPath)
                     ? Path.Combine(env.ContentRootPath, "wwwroot")
                     : env.WebRootPath;
-                var uploadsFolder = Path.Combine(root, "uploads");
+                var uploadsFolder = Path.Combine(root, "uploads", "trips", tripId.ToString());
                 Directory.CreateDirectory(uploadsFolder);
 
                 var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
@@ -105,7 +115,7 @@ public static class PhotosEndpoints
                     Id = Guid.NewGuid(),
                     TripId = tripId,
                     EntryId = entryId,
-                    ImageUri = $"/uploads/{fileName}",
+                    ImageUri = $"/uploads/trips/{tripId}/{fileName}",
                     Caption = string.IsNullOrWhiteSpace(caption) ? null : caption,
                     PhotoDate = photoDate,
                     Location = string.IsNullOrWhiteSpace(location) ? null : location.Trim(),

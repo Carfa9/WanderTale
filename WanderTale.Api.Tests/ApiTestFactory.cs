@@ -11,10 +11,14 @@ namespace WanderTale.Api.Tests;
 public sealed class ApiTestFactory : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
+    public string WebRootPath { get; } = Path.Combine(Path.GetTempPath(), $"wandertale-api-tests-{Guid.NewGuid():N}");
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         _connection.Open();
+        Directory.CreateDirectory(WebRootPath);
+
+        builder.UseWebRoot(WebRootPath);
 
         builder.ConfigureServices(services =>
         {
@@ -27,5 +31,10 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>
     {
         base.Dispose(disposing);
         _connection.Dispose();
+
+        if (Directory.Exists(WebRootPath))
+        {
+            Directory.Delete(WebRootPath, recursive: true);
+        }
     }
 }
