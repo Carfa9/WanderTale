@@ -23,7 +23,12 @@ async function getServerTripIdForFetch(tripId: string): Promise<string | null> {
 
 export async function getEntries(tripId: string): Promise<Entry[]> {
     const localEntries = await getLocalEntriesByTripId(tripId);
-    processPendingSyncQueue().catch(() => {});
+
+    try {
+        await processPendingSyncQueue();
+    } catch {
+        return localEntries;
+    }
 
     const serverTripId = await getServerTripIdForFetch(tripId);
 

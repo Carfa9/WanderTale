@@ -27,6 +27,8 @@ type PhotoRow = {
     updated_at: string;
 };
 
+type SyncStatus = "synced" | "pending" | "error";
+
 function nowIso() {
     return new Date().toISOString();
 }
@@ -219,6 +221,24 @@ export async function insertLocalPhoto(tripId: string, input: PhotoInput): Promi
     };
 }
 
+export async function hardDeleteLocalPhoto(localId: string): Promise<void> {
+    const db = await getDB();
+    await db.runAsync(`DELETE FROM photos WHERE local_id = ?`, [localId]);
+}
+
+export async function getSoftDeletedLocalPhotoId(localId: string): Promise<string | null> {
+    const db = await getDB();
+    const row = await db.getFirstAsync<{local_id: string}>(`
+        SELECT local_id
+        FROM photos
+        WHERE local_id = ?
+          AND deleted_at IS NOT NULL
+        LIMIT 1
+    `, [localId]);
+
+    return row?.local_id ?? null;
+}
+
 export async function markLocalPhotoSynced(localId: string, serverPhoto: Photo): Promise<void> {
     const db = await getDB();
 
@@ -230,9 +250,9 @@ export async function markLocalPhotoSynced(localId: string, serverPhoto: Photo):
             photo_date = ?,
             location = ?,
             sync_status = 'synced',
-            updated_at = ?,
-            deleted_at = NULL
+            updated_at = ?
         WHERE local_id = ?
+          AND deleted_at IS NULL
     `, [
         serverPhoto.id,
         serverPhoto.imageUri,
@@ -254,12 +274,32 @@ export async function upsertPhotoFromServer(tripId: string, photo: Photo): Promi
 
     const entryLocalId = photo.entryId ? await getEntryLocalId(photo.entryId) : null;
     const timestamp = nowIso();
-    const existing = await db.getFirstAsync<{local_id: string}>(`
-        SELECT local_id
+    const existing = await db.getFirstAsync<{
+        local_id: string;
+        server_id: string | null;
+        sync_status: SyncStatus;
+        deleted_at: string | null;
+    }>(`
+        SELECT local_id, server_id, sync_status, deleted_at
         FROM photos
         WHERE server_id = ? OR local_id = ?
         LIMIT 1
     `, [photo.id, photo.id]);
+
+    if (existing?.deleted_at) {
+        return;
+    }
+
+    if (existing && (existing.sync_status === "pending" || existing.sync_status === "error")) {
+        if (!existing.server_id) {
+            await db.runAsync(`
+                UPDATE photos
+                SET server_id = ?, updated_at = ?
+                WHERE local_id = ? AND server_id IS NULL
+            `, [photo.id, timestamp, existing.local_id]);
+        }
+        return;
+    }
 
     const localId = existing?.local_id ?? createLocalId("photo");
 

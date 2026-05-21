@@ -2,6 +2,7 @@
 
 export type Trip = {
     id: string;
+    clientId?: string | null;
     title: string;
     destination: string | null;
     startDate: string | null;

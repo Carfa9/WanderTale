@@ -12,6 +12,8 @@ type EntryRow = {
     entry_date: string | null;
 };
 
+type SyncStatus = "synced" | "pending" | "error";
+
 function nowIso() {
     return new Date().toISOString();
 }
@@ -178,6 +180,24 @@ export async function markLocalEntryDeleted(id: string): Promise<string | null> 
     return localId;
 }
 
+export async function hardDeleteLocalEntry(localId: string): Promise<void> {
+    const db = await getDB();
+    await db.runAsync(`DELETE FROM entries WHERE local_id = ?`, [localId]);
+}
+
+export async function getSoftDeletedLocalEntryId(localId: string): Promise<string | null> {
+    const db = await getDB();
+    const row = await db.getFirstAsync<{local_id: string}>(`
+        SELECT local_id
+        FROM entries
+        WHERE local_id = ?
+          AND deleted_at IS NOT NULL
+        LIMIT 1
+    `, [localId]);
+
+    return row?.local_id ?? null;
+}
+
 export async function markLocalEntrySynced(localId: string, serverEntry: Entry): Promise<void> {
     const db = await getDB();
 
@@ -188,9 +208,9 @@ export async function markLocalEntrySynced(localId: string, serverEntry: Entry):
             content = ?,
             entry_date = ?,
             sync_status = 'synced',
-            updated_at = ?,
-            deleted_at = NULL
+            updated_at = ?
         WHERE local_id = ?
+          AND deleted_at IS NULL
     `, [
         serverEntry.id,
         serverEntry.title ?? null,
@@ -210,12 +230,32 @@ export async function upsertEntryFromServer(tripId: string, entry: Entry): Promi
     }
 
     const timestamp = nowIso();
-    const existing = await db.getFirstAsync<{local_id: string}>(`
-        SELECT local_id
+    const existing = await db.getFirstAsync<{
+        local_id: string;
+        server_id: string | null;
+        sync_status: SyncStatus;
+        deleted_at: string | null;
+    }>(`
+        SELECT local_id, server_id, sync_status, deleted_at
         FROM entries
         WHERE server_id = ? OR local_id = ?
         LIMIT 1
     `, [entry.id, entry.id]);
+
+    if (existing?.deleted_at) {
+        return;
+    }
+
+    if (existing && (existing.sync_status === "pending" || existing.sync_status === "error")) {
+        if (!existing.server_id) {
+            await db.runAsync(`
+                UPDATE entries
+                SET server_id = ?, updated_at = ?
+                WHERE local_id = ? AND server_id IS NULL
+            `, [entry.id, timestamp, existing.local_id]);
+        }
+        return;
+    }
 
     const localId = existing?.local_id ?? createLocalId("entry");
 

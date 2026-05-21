@@ -29,6 +29,7 @@ function createLocalId(prefix: string) {
 function tripFromRow(row: TripRow, travelModes: TravelModeKey[]): Trip {
     return {
         id: row.server_id ?? row.local_id,
+        clientId: row.local_id,
         title: row.title,
         destination: row.destination,
         startDate: row.start_date,
@@ -121,6 +122,7 @@ export async function insertLocalTrip(dto: CreateTripDto): Promise<Trip> {
 
     return {
         id: localId,
+        clientId: localId,
         title: dto.title,
         destination: dto.destination ?? null,
         startDate: dto.startDate ?? null,
@@ -166,6 +168,7 @@ export async function updateLocalTrip(id: string, dto: CreateTripDto): Promise<T
 
     return {
         id,
+        clientId: localId,
         title: dto.title,
         destination: dto.destination ?? null,
         startDate: dto.startDate ?? null,
@@ -193,6 +196,58 @@ export async function markLocalTripDeleted(id: string): Promise<string | null> {
     return localId;
 }
 
+export async function hardDeleteLocalTrip(localId: string): Promise<void> {
+    const db = await getDB();
+    await db.runAsync(`DELETE FROM trips WHERE local_id = ?`, [localId]);
+}
+
+export async function markLocalTripDeleteSynced(localId: string, serverId?: string | null): Promise<void> {
+    const db = await getDB();
+    const timestamp = nowIso();
+
+    await db.runAsync(`
+        UPDATE trips
+        SET server_id = COALESCE(server_id, ?),
+            sync_status = 'synced',
+            updated_at = ?
+        WHERE local_id = ?
+          AND deleted_at IS NOT NULL
+    `, [serverId ?? null, timestamp, localId]);
+}
+
+export async function getSoftDeletedLocalTripId(localId: string): Promise<string | null> {
+    const db = await getDB();
+    const row = await db.getFirstAsync<{local_id: string}>(`
+        SELECT local_id
+        FROM trips
+        WHERE local_id = ?
+          AND deleted_at IS NOT NULL
+        LIMIT 1
+    `, [localId]);
+
+    return row?.local_id ?? null;
+}
+
+async function getSoftDeletedTripBySignature(trip: Trip): Promise<{local_id: string} | null> {
+    const db = await getDB();
+
+    return db.getFirstAsync<{local_id: string}>(`
+        SELECT local_id
+        FROM trips
+        WHERE deleted_at IS NOT NULL
+          AND title = ?
+          AND COALESCE(destination, '') = COALESCE(?, '')
+          AND COALESCE(start_date, '') = COALESCE(?, '')
+          AND COALESCE(end_date, '') = COALESCE(?, '')
+        LIMIT 1
+    `, [
+        trip.title,
+        trip.destination ?? null,
+        trip.startDate ?? null,
+        trip.endDate ?? null,
+    ]);
+}
+
 export async function markLocalTripSynced(localId: string, serverTrip: Trip): Promise<void> {
     const db = await getDB();
     const timestamp = nowIso();
@@ -207,9 +262,9 @@ export async function markLocalTripSynced(localId: string, serverTrip: Trip): Pr
                 end_date = ?,
                 description = ?,
                 sync_status = 'synced',
-                updated_at = ?,
-                deleted_at = NULL
+                updated_at = ?
             WHERE local_id = ?
+              AND deleted_at IS NULL
         `, [
             serverTrip.id,
             serverTrip.title,
@@ -228,12 +283,43 @@ export async function markLocalTripSynced(localId: string, serverTrip: Trip): Pr
 export async function upsertTripFromServer(trip: Trip): Promise<void> {
     const db = await getDB();
     const timestamp = nowIso();
-    const existing = await db.getFirstAsync<{local_id: string}>(`
-        SELECT local_id
+    const existing = await db.getFirstAsync<{
+        local_id: string;
+        server_id: string | null;
+        sync_status: SyncStatus;
+        deleted_at: string | null;
+    }>(`
+        SELECT local_id, server_id, sync_status, deleted_at
         FROM trips
-        WHERE server_id = ? OR local_id = ?
+        WHERE server_id = ? OR local_id = ? OR local_id = ?
         LIMIT 1
-    `, [trip.id, trip.id]);
+    `, [trip.id, trip.id, trip.clientId ?? ""]);
+
+    if (existing?.deleted_at) {
+        return;
+    }
+
+    const deletedBySignature = await getSoftDeletedTripBySignature(trip);
+    if (deletedBySignature) {
+        return;
+    }
+
+    if (existing && (existing.sync_status === "pending" || existing.sync_status === "error")) {
+        if (!existing.server_id) {
+            await db.withTransactionAsync(async () => {
+                await db.runAsync(`
+                    UPDATE trips
+                    SET server_id = ?,
+                        sync_status = 'synced',
+                        updated_at = ?
+                    WHERE local_id = ? AND server_id IS NULL
+                `, [trip.id, timestamp, existing.local_id]);
+
+                await replaceTripTravelModes(existing.local_id, trip.travelModes ?? [], "synced");
+            });
+        }
+        return;
+    }
 
     const localId = existing?.local_id ?? createLocalId("trip");
 
@@ -279,14 +365,18 @@ export async function upsertTripsFromServer(trips: Trip[]): Promise<void> {
 export async function getLocalTripTravelModes(tripLocalId: string): Promise<TravelModeKey[]> {
     const db = await getDB();
     const rows = await db.getAllAsync<TravelModeRow>(`
-        SELECT mode
+        SELECT DISTINCT mode
         FROM trip_travel_modes
         WHERE trip_local_id = ?
           AND deleted_at IS NULL
-        ORDER BY created_at ASC
+        ORDER BY mode ASC
     `, [tripLocalId]);
 
     return rows.map((row) => row.mode);
+}
+
+function tripModeLocalId(tripLocalId: string, mode: TravelModeKey): string {
+    return `trip_mode_${tripLocalId}_${mode}`;
 }
 
 export async function replaceTripTravelModes(
@@ -296,20 +386,21 @@ export async function replaceTripTravelModes(
 ) {
     const db = await getDB();
     const timestamp = nowIso();
+    const uniqueModes = Array.from(new Set(travelModes));
 
     await db.runAsync(`
         DELETE FROM trip_travel_modes
         WHERE trip_local_id = ?
     `, [tripLocalId]);
 
-    for (const mode of travelModes) {
+    for (const mode of uniqueModes) {
         await db.runAsync(`
-            INSERT INTO trip_travel_modes (
+            INSERT OR REPLACE INTO trip_travel_modes (
                 local_id, trip_local_id, mode, sync_status, created_at, updated_at, deleted_at
             )
             VALUES (?, ?, ?, ?, ?, ?, NULL)
         `, [
-            createLocalId("trip_mode"),
+            tripModeLocalId(tripLocalId, mode),
             tripLocalId,
             mode,
             syncStatus,

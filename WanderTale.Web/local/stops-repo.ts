@@ -35,6 +35,7 @@ function createLocalId(prefix: string) {
 function stopFromRow(row: StopRow, travelModes: TravelModeKey[]): Stop {
     return {
         id: row.server_id ?? row.local_id,
+        clientId: row.local_id,
         tripId: row.trip_server_id ?? row.trip_local_id,
         title: row.title,
         description: row.description,
@@ -121,6 +122,21 @@ export async function getLocalStopForSync(localId: string): Promise<{stop: Stop;
     };
 }
 
+export async function getStopServerId(localId: string): Promise<string | null> {
+    const db = await getDB();
+    const row = await db.getFirstAsync<{server_id: string | null}>(
+        `
+        SELECT server_id
+        FROM stops
+        WHERE local_id = ?
+        LIMIT 1
+    `,
+        [localId]
+    );
+
+    return row?.server_id ?? null;
+}
+
 export async function insertLocalStop(tripId: string, dto: CreateStopDto): Promise<Stop> {
     const db = await getDB();
     const tripLocalId = await getTripLocalId(tripId);
@@ -159,6 +175,7 @@ export async function insertLocalStop(tripId: string, dto: CreateStopDto): Promi
 
     return {
         id: localId,
+        clientId: localId,
         tripId,
         title: dto.title,
         description: dto.description ?? null,
@@ -215,12 +232,15 @@ export async function upsertStopFromServer(tripId: string, stop: Stop): Promise<
     }
 
     const timestamp = nowIso();
-    const existing = await db.getFirstAsync<{local_id: string}>(`
+    const existing = await db.getFirstAsync<{local_id: string}>(
+        `
         SELECT local_id
         FROM stops
-        WHERE server_id = ? OR local_id = ?
+        WHERE server_id = ? OR local_id = ? OR local_id = ?
         LIMIT 1
-    `, [stop.id, stop.id]);
+    `,
+        [stop.id, stop.id, stop.clientId ?? ""]
+    );
 
     const localId = existing?.local_id ?? createLocalId("stop");
 
@@ -271,14 +291,18 @@ export async function upsertStopsFromServer(tripId: string, stops: Stop[]): Prom
 export async function getLocalStopTravelModes(stopLocalId: string): Promise<TravelModeKey[]> {
     const db = await getDB();
     const rows = await db.getAllAsync<TravelModeRow>(`
-        SELECT mode
+        SELECT DISTINCT mode
         FROM stop_travel_modes
         WHERE stop_local_id = ?
           AND deleted_at IS NULL
-        ORDER BY created_at ASC
+        ORDER BY mode ASC
     `, [stopLocalId]);
 
     return rows.map((row) => row.mode);
+}
+
+function stopModeLocalId(stopLocalId: string, mode: TravelModeKey): string {
+    return `stop_mode_${stopLocalId}_${mode}`;
 }
 
 export async function replaceStopTravelModes(
@@ -288,20 +312,21 @@ export async function replaceStopTravelModes(
 ): Promise<void> {
     const db = await getDB();
     const timestamp = nowIso();
+    const uniqueModes = Array.from(new Set(travelModes));
 
     await db.runAsync(`
         DELETE FROM stop_travel_modes
         WHERE stop_local_id = ?
     `, [stopLocalId]);
 
-    for (const mode of travelModes) {
+    for (const mode of uniqueModes) {
         await db.runAsync(`
-            INSERT INTO stop_travel_modes (
+            INSERT OR REPLACE INTO stop_travel_modes (
                 local_id, stop_local_id, mode, sync_status, created_at, updated_at, deleted_at
             )
             VALUES (?, ?, ?, ?, ?, ?, NULL)
         `, [
-            createLocalId("stop_mode"),
+            stopModeLocalId(stopLocalId, mode),
             stopLocalId,
             mode,
             syncStatus,

@@ -1,8 +1,26 @@
 import {ApiError, apiFetch} from "@/api/http";
-import {getEntryServerId, getLocalEntryForSync, markLocalEntrySynced} from "@/local/entries-repo";
-import {getLocalPhotoForSync, getPhotoServerId, markLocalPhotoSynced} from "@/local/photos-repo";
-import {getLocalStopForSync, markLocalStopSynced} from "@/local/stops-repo";
-import {getLocalTripById, getTripServerId, markLocalTripSynced} from "@/local/trips-repo";
+import {
+    getEntryServerId,
+    getLocalEntryForSync,
+    getSoftDeletedLocalEntryId,
+    hardDeleteLocalEntry,
+    markLocalEntrySynced,
+} from "@/local/entries-repo";
+import {
+    getLocalPhotoForSync,
+    getPhotoServerId,
+    getSoftDeletedLocalPhotoId,
+    hardDeleteLocalPhoto,
+    markLocalPhotoSynced,
+} from "@/local/photos-repo";
+import {getLocalStopForSync, getStopServerId, markLocalStopSynced} from "@/local/stops-repo";
+import {
+    getLocalTripById,
+    getSoftDeletedLocalTripId,
+    getTripServerId,
+    markLocalTripDeleteSynced,
+    markLocalTripSynced,
+} from "@/local/trips-repo";
 import {CreateStopDto, Stop} from "@/types/stop";
 import {CreateEntryDto} from "@/dto/createEntryDto";
 import {Entry} from "@/types/entry";
@@ -31,18 +49,34 @@ function isNotFound(error: unknown): boolean {
 async function syncTripCreate(item: SyncQueueItem): Promise<void> {
     const localTrip = await getLocalTripById(item.entity_local_id);
 
-    if (!localTrip) return;
+    if (!localTrip) {
+        const softDeleted = await getSoftDeletedLocalTripId(item.entity_local_id);
+        if (softDeleted) await markLocalTripDeleteSynced(softDeleted);
+        return;
+    }
 
     const existingServerId = await getTripServerId(item.entity_local_id);
 
     if (existingServerId) return;
 
-    const dto: CreateTripDto = JSON.parse(item.payload);
+    const dto: CreateTripDto & {clientId?: string | null} = JSON.parse(item.payload);
     const serverTrip = await apiFetch<Trip>("/trips", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(dto),
+        body: JSON.stringify({...dto, clientId: dto.clientId ?? item.entity_local_id}),
     });
+
+    const softDeletedAfter = await getSoftDeletedLocalTripId(item.entity_local_id);
+    if (softDeletedAfter) {
+        try {
+            await apiFetch<void>(`/trips/${serverTrip.id}`, {method: "DELETE"});
+        } catch (error) {
+            if (!isNotFound(error)) throw error;
+        }
+        await markLocalTripDeleteSynced(softDeletedAfter, serverTrip.id);
+        return;
+    }
+
     await markLocalTripSynced(item.entity_local_id, serverTrip);
 }
 
@@ -65,16 +99,22 @@ async function syncTripUpdate(item: SyncQueueItem): Promise<void> {
 async function syncTripDelete(item: SyncQueueItem): Promise<void> {
     const tripServerId = await getTripServerId(item.entity_local_id);
 
-    if (!tripServerId) return;
-
-    try {
-        await apiFetch<void>(`/trips/${tripServerId}`, {method: "DELETE"});
-    } catch (error) {
-        if (!isNotFound(error)) throw error;
+    if (tripServerId) {
+        try {
+            await apiFetch<void>(`/trips/${tripServerId}`, {method: "DELETE"});
+        } catch (error) {
+            if (!isNotFound(error)) throw error;
+        }
     }
+
+    await markLocalTripDeleteSynced(item.entity_local_id, tripServerId);
 }
 
 async function syncStopCreate(item: SyncQueueItem): Promise<void> {
+    const existingServerId = await getStopServerId(item.entity_local_id);
+
+    if (existingServerId) return;
+
     const localStop = await getLocalStopForSync(item.entity_local_id);
 
     if (!localStop) {
@@ -87,11 +127,11 @@ async function syncStopCreate(item: SyncQueueItem): Promise<void> {
         throw new Error(`Trip is not synced yet: ${localStop.tripLocalId}`);
     }
 
-    const dto: CreateStopDto = JSON.parse(item.payload);
+    const dto: CreateStopDto & {clientId?: string | null} = JSON.parse(item.payload);
     const serverStop = await apiFetch<Stop>(`/trips/${tripServerId}/stops`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(dto),
+        body: JSON.stringify({...dto, clientId: dto.clientId ?? item.entity_local_id}),
     });
     await markLocalStopSynced(item.entity_local_id, serverStop);
 }
@@ -106,6 +146,11 @@ async function syncEntryCreate(item: SyncQueueItem): Promise<void> {
     const localEntry = await getLocalEntryForSync(item.entity_local_id);
 
     if (!localEntry) {
+        const softDeleted = await getSoftDeletedLocalEntryId(item.entity_local_id);
+        if (softDeleted) {
+            await hardDeleteLocalEntry(softDeleted);
+            return;
+        }
         throw new Error(`Local entry not found: ${item.entity_local_id}`);
     }
 
@@ -121,6 +166,18 @@ async function syncEntryCreate(item: SyncQueueItem): Promise<void> {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(dto),
     });
+
+    const softDeletedAfter = await getSoftDeletedLocalEntryId(item.entity_local_id);
+    if (softDeletedAfter) {
+        try {
+            await apiFetch<void>(`/entries/${serverEntry.id}`, {method: "DELETE"});
+        } catch (error) {
+            if (!isNotFound(error)) throw error;
+        }
+        await hardDeleteLocalEntry(softDeletedAfter);
+        return;
+    }
+
     await markLocalEntrySynced(item.entity_local_id, serverEntry);
 }
 
@@ -143,19 +200,23 @@ async function syncEntryUpdate(item: SyncQueueItem): Promise<void> {
 async function syncEntryDelete(item: SyncQueueItem): Promise<void> {
     const entryServerId = await getEntryServerId(item.entity_local_id);
 
-    if (!entryServerId) return;
-
-    try {
-        await apiFetch<void>(`/entries/${entryServerId}`, {method: "DELETE"});
-    } catch (error) {
-        if (!isNotFound(error)) throw error;
+    if (entryServerId) {
+        try {
+            await apiFetch<void>(`/entries/${entryServerId}`, {method: "DELETE"});
+        } catch (error) {
+            if (!isNotFound(error)) throw error;
+        }
     }
+
+    await hardDeleteLocalEntry(item.entity_local_id);
 }
 
 async function syncPhotoCreate(item: SyncQueueItem): Promise<void> {
     const localPhoto = await getLocalPhotoForSync(item.entity_local_id);
 
     if (!localPhoto) {
+        const softDeleted = await getSoftDeletedLocalPhotoId(item.entity_local_id);
+        if (softDeleted) await hardDeleteLocalPhoto(softDeleted);
         return;
     }
 
@@ -189,21 +250,33 @@ async function syncPhotoCreate(item: SyncQueueItem): Promise<void> {
         method: "POST",
         body: formData,
     });
+
+    const softDeletedAfter = await getSoftDeletedLocalPhotoId(item.entity_local_id);
+    if (softDeletedAfter) {
+        try {
+            await apiFetch<void>(`/photos/${serverPhoto.id}`, {method: "DELETE"});
+        } catch (error) {
+            if (!isNotFound(error)) throw error;
+        }
+        await hardDeleteLocalPhoto(softDeletedAfter);
+        return;
+    }
+
     await markLocalPhotoSynced(item.entity_local_id, serverPhoto);
 }
 
 async function syncPhotoDelete(item: SyncQueueItem): Promise<void> {
     const photoServerId = await getPhotoServerId(item.entity_local_id);
 
-    if (!photoServerId) {
-        return;
+    if (photoServerId) {
+        try {
+            await apiFetch<void>(`/photos/${photoServerId}`, {method: "DELETE"});
+        } catch (error) {
+            if (!isNotFound(error)) throw error;
+        }
     }
 
-    try {
-        await apiFetch<void>(`/photos/${photoServerId}`, {method: "DELETE"});
-    } catch (error) {
-        if (!isNotFound(error)) throw error;
-    }
+    await hardDeleteLocalPhoto(item.entity_local_id);
 }
 
 async function syncPhotoCaptionUpdate(item: SyncQueueItem): Promise<void> {

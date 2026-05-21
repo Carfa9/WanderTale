@@ -2,6 +2,7 @@ import {TravelModeKey} from "@/types/travelMode";
 
 export type Stop = {
     id: string;
+    clientId?: string | null;
     tripId: string;
     title: string;
     description: string | null;
@@ -15,6 +16,7 @@ export type Stop = {
 };
 
 export type CreateStopDto = {
+    clientId?: string | null;
     title: string;
     description?: string | null;
     startDate: string | null;

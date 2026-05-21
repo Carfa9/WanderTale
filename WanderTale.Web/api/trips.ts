@@ -15,7 +15,12 @@ import {CreateTripDto, Trip} from "@/types/trip";
 
 export async function getTrips(): Promise<Trip[]> {
     const localTrips = await getLocalTrips();
-    processPendingSyncQueue().catch(() => {});
+
+    try {
+        await processPendingSyncQueue();
+    } catch {
+        return localTrips;
+    }
 
     try {
         const serverTrips = await apiFetch<Trip[]>("/trips");
@@ -31,17 +36,6 @@ export async function getTripById(id: string): Promise<Trip> {
     const localTrip = await getLocalTripById(id);
 
     if (localTrip) {
-        const localId = await getTripLocalId(id);
-        const serverId = localId ? await getTripServerId(localId) : null;
-
-        if (serverId) {
-            apiFetch<Trip>(`/trips/${serverId}`)
-                .then(async (serverTrip) => {
-                    await upsertTripsFromServer([serverTrip]);
-                })
-                .catch(() => {});
-        }
-
         return localTrip;
     }
 
@@ -53,7 +47,7 @@ export async function getTripById(id: string): Promise<Trip> {
 
 export async function createTrip(dto: CreateTripDto): Promise<Trip> {
     const localTrip = await insertLocalTrip(dto);
-    await enqueueSyncOperation("trip", localTrip.id, "create", dto);
+    await enqueueSyncOperation("trip", localTrip.id, "create", {...dto, clientId: localTrip.id});
 
     processPendingSyncQueue().catch(() => {});
 

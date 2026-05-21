@@ -124,6 +124,48 @@ export async function initializeLocalSchema() {
 
         CREATE INDEX IF NOT EXISTS idx_sync_queue_status_created_at
             ON sync_queue(status, created_at);
+
+        DELETE FROM trips
+        WHERE server_id IS NULL
+          AND deleted_at IS NULL
+          AND EXISTS (
+            SELECT 1 FROM trips t2
+            WHERE t2.server_id IS NOT NULL
+              AND t2.deleted_at IS NULL
+              AND t2.title = trips.title
+              AND COALESCE(t2.destination, '') = COALESCE(trips.destination, '')
+              AND COALESCE(t2.start_date, '') = COALESCE(trips.start_date, '')
+              AND COALESCE(t2.end_date, '') = COALESCE(trips.end_date, '')
+          );
+
+        DELETE FROM entries
+        WHERE server_id IS NULL
+          AND deleted_at IS NULL
+          AND EXISTS (
+            SELECT 1 FROM entries e2
+            WHERE e2.server_id IS NOT NULL
+              AND e2.deleted_at IS NULL
+              AND e2.trip_local_id = entries.trip_local_id
+              AND COALESCE(e2.title, '') = COALESCE(entries.title, '')
+              AND COALESCE(e2.content, '') = COALESCE(entries.content, '')
+              AND COALESCE(e2.entry_date, '') = COALESCE(entries.entry_date, '')
+          );
+
+        DELETE FROM trip_travel_modes
+        WHERE local_id NOT IN (
+            SELECT MIN(local_id) FROM trip_travel_modes GROUP BY trip_local_id, mode
+        );
+
+        DELETE FROM stop_travel_modes
+        WHERE local_id NOT IN (
+            SELECT MIN(local_id) FROM stop_travel_modes GROUP BY stop_local_id, mode
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_trip_travel_modes_trip_mode
+            ON trip_travel_modes(trip_local_id, mode);
+
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_stop_travel_modes_stop_mode
+            ON stop_travel_modes(stop_local_id, mode);
     `);
 }
 

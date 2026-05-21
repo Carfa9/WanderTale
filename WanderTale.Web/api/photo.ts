@@ -4,6 +4,7 @@ import {
     getLocalPhotosByTripId,
     getPhotoLocalId,
     getPhotoServerId,
+    hardDeleteLocalPhoto,
     insertLocalPhoto,
     markLocalPhotoDeleted,
     photoInputFromFormData,
@@ -52,9 +53,13 @@ export async function deletePhoto(photoId: string): Promise<void> {
 
     try {
         await apiFetch<void>(`/photos/${photoServerId}`, {method: "DELETE"});
+        if (photoLocalId) {
+            await hardDeleteLocalPhoto(photoLocalId);
+        }
     } catch {
         if (photoLocalId) {
             await enqueueSyncOperation("photo", photoLocalId, "delete", {});
+            processPendingSyncQueue().catch(() => {});
         }
     }
 }
@@ -87,7 +92,12 @@ export async function updatePhotoCaption(photoId: string, caption: string | null
 
 export async function getPhotos(tripId: string): Promise<Photo[]> {
     const localPhotos = await getLocalPhotosByTripId(tripId);
-    processPendingSyncQueue().catch(() => {});
+
+    try {
+        await processPendingSyncQueue();
+    } catch {
+        return localPhotos;
+    }
 
     const serverTripId = await getServerTripIdForFetch(tripId);
 

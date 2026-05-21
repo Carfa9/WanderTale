@@ -48,7 +48,7 @@ export async function getStopsByTripId(tripId: string): Promise<Stop[]> {
 
 export async function createStop(tripId: string, dto: CreateStopDto): Promise<Stop> {
     const localStop = await insertLocalStop(tripId, dto);
-    await enqueueSyncOperation("stop", localStop.id, "create", dto);
+    await enqueueSyncOperation("stop", localStop.id, "create", {...dto, clientId: localStop.id});
 
     processPendingSyncQueue().catch(() => {});
 
