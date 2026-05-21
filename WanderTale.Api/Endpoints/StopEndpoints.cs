@@ -17,6 +17,7 @@ public static class StopEndpoints
                 .Select(s => new
                 {
                     s.Id,
+                    s.ClientId,
                     s.TripId,
                     s.Title,
                     s.Description,
@@ -37,6 +38,32 @@ public static class StopEndpoints
         {
             try
             {
+                if (!string.IsNullOrWhiteSpace(request.ClientId))
+                {
+                    var existingStop = await db.Stops
+                        .Include(s => s.TravelModes)
+                        .FirstOrDefaultAsync(s => s.ClientId == request.ClientId);
+
+                    if (existingStop is not null)
+                    {
+                        return Results.Ok(new
+                        {
+                            existingStop.Id,
+                            existingStop.ClientId,
+                            existingStop.TripId,
+                            existingStop.Title,
+                            existingStop.Description,
+                            existingStop.StartDate,
+                            existingStop.EndDate,
+                            existingStop.CreatedAt,
+                            existingStop.UpdatedAt,
+                            existingStop.Country,
+                            existingStop.OrderIndex,
+                            TravelModes = existingStop.TravelModes.Select(x => x.Mode).ToList()
+                        });
+                    }
+                }
+
                 var now = DateTime.UtcNow;
 
                 var nextOrderIndex = await db.Stops
@@ -46,6 +73,7 @@ public static class StopEndpoints
                 var stop = new Stop
                 {
                     Id = Guid.NewGuid(),
+                    ClientId = string.IsNullOrWhiteSpace(request.ClientId) ? null : request.ClientId,
                     TripId = tripId,
                     Title = request.Title,
                     Description = request.Description,
@@ -56,6 +84,7 @@ public static class StopEndpoints
                     CreatedAt = now,
                     UpdatedAt = now,
                     TravelModes = (request.TravelModes ?? [])
+                        .Distinct()
                         .Select(m => new StopTravelMode { Mode = m })
                         .ToList()
                 };
@@ -66,6 +95,7 @@ public static class StopEndpoints
                 return Results.Created($"/trips/{tripId}/stops/{stop.Id}", new
                 {
                     stop.Id,
+                    stop.ClientId,
                     stop.TripId,
                     stop.Title,
                     stop.Description,

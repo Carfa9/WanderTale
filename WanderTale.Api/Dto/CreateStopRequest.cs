@@ -5,5 +5,6 @@ public record CreateStopRequest(
     DateTime? StartDate,
     DateTime? EndDate,
     string? Country,
-    List<string> TravelModes
+    List<string> TravelModes,
+    string? ClientId = null
 );

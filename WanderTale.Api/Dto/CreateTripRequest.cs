@@ -5,5 +5,6 @@ public record CreateTripRequest(
     string? Description,
     DateTime? StartDate,
     DateTime? EndDate,
-    List<string> TravelModes
+    List<string> TravelModes,
+    string? ClientId = null
 );

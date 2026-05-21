@@ -81,6 +81,39 @@ public sealed class StopsEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateStop_WithSameClientIdTwice_ReturnsExistingStop()
+    {
+        var tripId = await CreateTrip();
+
+        var request = new CreateStopRequest(
+            "Kyoto",
+            "Stop",
+            new DateTime(2026, 4, 2),
+            new DateTime(2026, 4, 15),
+            "Japan",
+            ["Plane", "Plane", "Train"],
+            "stop_local_1"
+        );
+
+        var firstResponse = await _client.PostAsJsonAsync($"/trips/{tripId}/stops", request);
+        var secondResponse = await _client.PostAsJsonAsync($"/trips/{tripId}/stops", request);
+
+        firstResponse.EnsureSuccessStatusCode();
+        secondResponse.EnsureSuccessStatusCode();
+
+        var first = await firstResponse.Content.ReadFromJsonAsync<StopResponse>();
+        var second = await secondResponse.Content.ReadFromJsonAsync<StopResponse>();
+        var stops = await _client.GetFromJsonAsync<List<StopResponse>>($"/trips/{tripId}/stops");
+
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        Assert.NotNull(stops);
+        Assert.Equal(first.Id, second.Id);
+        Assert.Single(stops);
+        Assert.Equal(["Plane", "Train"], first.TravelModes);
+    }
+
+    [Fact]
     public async Task CreateStop_WhenMultipleStopsExist_AssignsIncrementingOrderIndex()
     {
         var tripId = await CreateTrip();

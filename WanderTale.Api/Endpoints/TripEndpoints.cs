@@ -15,6 +15,7 @@ public static class TripEndpoints
                 .Select(t => new
                 {
                     t.Id,
+                    t.ClientId,
                     t.Title,
                     t.Destination,
                     t.StartDate,
@@ -36,6 +37,7 @@ public static class TripEndpoints
             return Results.Ok(new
             {
                 trip.Id,
+                trip.ClientId,
                 trip.Title,
                 trip.Destination,
                 trip.StartDate,
@@ -49,10 +51,35 @@ public static class TripEndpoints
         {
             try
             {
+                if (!string.IsNullOrWhiteSpace(request.ClientId))
+                {
+                    var existingTrip = await db.Trips
+                        .Include(t => t.TravelModes)
+                        .FirstOrDefaultAsync(t => t.ClientId == request.ClientId);
+
+                    if (existingTrip is not null)
+                    {
+                        return Results.Ok(new
+                        {
+                            existingTrip.Id,
+                            existingTrip.ClientId,
+                            existingTrip.Title,
+                            existingTrip.Destination,
+                            existingTrip.StartDate,
+                            existingTrip.EndDate,
+                            existingTrip.Description,
+                            existingTrip.CreatedAt,
+                            existingTrip.UpdatedAt,
+                            TravelModes = existingTrip.TravelModes.Select(x => x.Mode).ToList()
+                        });
+                    }
+                }
+
                 var now = DateTime.UtcNow;
 
                 var trip = new Trip
                 {
+                    ClientId = string.IsNullOrWhiteSpace(request.ClientId) ? null : request.ClientId,
                     Title = request.Title,
                     Destination = request.Destination,
                     Description = request.Description,
@@ -60,7 +87,8 @@ public static class TripEndpoints
                     EndDate = request.EndDate,
                     CreatedAt = now,
                     UpdatedAt = now,
-                    TravelModes = (request.TravelModes)
+                    TravelModes = (request.TravelModes ?? [])
+                        .Distinct()
                         .Select(m => new TripTravelMode { Mode = m })
                         .ToList()
                 };
@@ -71,6 +99,7 @@ public static class TripEndpoints
                 return Results.Created($"/trips/{trip.Id}", new
                 {
                     trip.Id,
+                    trip.ClientId,
                     trip.Title,
                     trip.Destination,
                     trip.StartDate,
@@ -104,6 +133,7 @@ public static class TripEndpoints
 
             db.TripTravelModes.RemoveRange(trip.TravelModes);
             trip.TravelModes = (request.TravelModes ?? [])
+                .Distinct()
                 .Select(m => new TripTravelMode { TripId = trip.Id, Mode = m })
                 .ToList();
 
@@ -112,6 +142,7 @@ public static class TripEndpoints
             return Results.Ok(new
             {
                 trip.Id,
+                trip.ClientId,
                 trip.Title,
                 trip.Destination,
                 trip.StartDate,

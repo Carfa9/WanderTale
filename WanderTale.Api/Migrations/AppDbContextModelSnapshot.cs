@@ -94,6 +94,9 @@ namespace WanderTale.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ClientId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Country")
                         .HasColumnType("TEXT");
 
@@ -124,6 +127,9 @@ namespace WanderTale.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ClientId")
+                        .IsUnique();
+
                     b.HasIndex("TripId");
 
                     b.ToTable("Stops");
@@ -146,6 +152,9 @@ namespace WanderTale.Migrations
 
                     b.HasIndex("StopId");
 
+                    b.HasIndex("StopId", "Mode")
+                        .IsUnique();
+
                     b.ToTable("StopTravelModes");
                 });
 
@@ -153,6 +162,9 @@ namespace WanderTale.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ClientId")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
@@ -182,6 +194,9 @@ namespace WanderTale.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ClientId")
+                        .IsUnique();
+
                     b.ToTable("Trips");
                 });
 
@@ -201,6 +216,9 @@ namespace WanderTale.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TripId");
+
+                    b.HasIndex("TripId", "Mode")
+                        .IsUnique();
 
                     b.ToTable("TripTravelModes");
                 });

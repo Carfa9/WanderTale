@@ -3,6 +3,7 @@
 public class Trip
 {
     public Guid Id { get; set; }
+    public string? ClientId { get; set; }
     public int UserId { get; set; }
 
     public string Title { get; set; } = null!;
@@ -61,6 +62,7 @@ public class Photo
 public class Stop
 {
     public Guid Id { get; set; }
+    public string? ClientId { get; set; }
 
     public Guid TripId { get; set; }
     public Trip Trip { get; set; } = null!;

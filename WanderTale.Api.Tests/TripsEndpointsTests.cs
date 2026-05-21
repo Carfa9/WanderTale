@@ -60,6 +60,37 @@ public sealed class TripsEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateTrip_WithSameClientIdTwice_ReturnsExistingTrip()
+    {
+        var request = new CreateTripRequest(
+            "Tokyo",
+            "Japan",
+            "Spring trip",
+            new DateTime(2026, 4, 1),
+            new DateTime(2026, 4, 14),
+            ["Plane", "Plane", "Train"],
+            "trip_local_1"
+        );
+
+        var firstResponse = await _client.PostAsJsonAsync("/trips", request);
+        var secondResponse = await _client.PostAsJsonAsync("/trips", request);
+
+        firstResponse.EnsureSuccessStatusCode();
+        secondResponse.EnsureSuccessStatusCode();
+
+        var first = await firstResponse.Content.ReadFromJsonAsync<TripResponse>();
+        var second = await secondResponse.Content.ReadFromJsonAsync<TripResponse>();
+        var trips = await _client.GetFromJsonAsync<List<TripResponse>>("/trips");
+
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        Assert.NotNull(trips);
+        Assert.Equal(first.Id, second.Id);
+        Assert.Single(trips);
+        Assert.Equal(["Plane", "Train"], first.TravelModes);
+    }
+
+    [Fact]
     public async Task UpdateTrip_WhenTripsExist_ReturnsUpdatedTrip()
     {
         var request = new CreateTripRequest(
