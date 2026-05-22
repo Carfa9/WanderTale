@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<Photo> Photo => Set<Photo>();
     public DbSet<Stop> Stops => Set<Stop>();
     public DbSet<StopTravelMode> StopTravelModes => Set<StopTravelMode>();
+    public DbSet<User> Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -33,6 +34,10 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<StopTravelMode>()
             .HasIndex(sm => new { sm.StopId, sm.Mode })
+            .IsUnique();
+        
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.Email)
             .IsUnique();
     }
 }

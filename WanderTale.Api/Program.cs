@@ -1,8 +1,11 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using WanderTale;
-using WanderTale.Dto;
 using WanderTale.Endpoints;
 using WanderTale.Models;
 
@@ -11,6 +14,33 @@ var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("Default")
                        ?? "Data Source=wanderTale.db";
+
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+
+var jwtSigningKey = builder.Configuration["Jwt:SigningKey"]
+                    ?? throw new InvalidOperationException("Missing Jwt:SigningKey.");
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            
+            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "WanderTale",
+            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "WanderTale",
+            
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtSigningKey))
+        });
+
+builder.Services.AddAuthorization();
+
+builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options
@@ -26,10 +56,6 @@ builder.Services.AddSwaggerGen(options =>
         Version = "v1"
     });
 });
-
-var allowedOrigins = builder.Configuration
-    .GetSection("Cors:AllowedOrigins")
-    .Get<string[]>() ?? [];
 
 builder.Services.AddCors(options =>
 {
@@ -66,6 +92,9 @@ using (var scope = app.Services.CreateScope())
 
 app.UseCors("AllowFrontend");
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseStaticFiles();
 
 if (app.Environment.IsDevelopment())
@@ -79,6 +108,7 @@ app.MapStopEndpoints();
 app.MapPhotosEndpoints();
 app.MapEntriesEndpoints();
 app.MapThemesEndpoints();
+app.MapAuthEndpoints();
 
 app.Run();
 

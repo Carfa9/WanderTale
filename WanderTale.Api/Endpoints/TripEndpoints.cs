@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
 using WanderTale.Dto;
 using WanderTale.Models;
 
@@ -8,8 +9,17 @@ public static class TripEndpoints
 {
     public static void MapTripEndpoints(this WebApplication app)
     {
-        app.MapGet("/trips", async (AppDbContext db) =>
-            await db.Trips
+        app.MapGet("/trips", async (AppDbContext db, ClaimsPrincipal user) =>
+        {
+            var userId = GetUserId(user);
+
+            if (userId is null)
+            {
+                return Results.Unauthorized();
+            }
+
+            var trips = await db.Trips
+                .Where(t => t.UserId == userId.Value)
                 .Include(t => t.TravelModes)
                 .OrderBy(t => t.StartDate ?? t.CreatedAt)
                 .Select(t => new
@@ -23,13 +33,24 @@ public static class TripEndpoints
                     t.Description,
                     TravelModes = t.TravelModes.Select(x => x.Mode).ToList()
                 })
-                .ToListAsync());
+                .ToListAsync();
+
+            return Results.Ok(trips);
+        }).RequireAuthorization();
         
-        app.MapGet("/trips/{id:guid}", async (AppDbContext db, Guid id) =>
+        
+        app.MapGet("/trips/{id:guid}", async (AppDbContext db, Guid id, ClaimsPrincipal user ) =>
         {
+            var userId = GetUserId(user);
+
+            if (userId is null)
+            {
+                return Results.Unauthorized();
+            }
+            
             var trip = await db.Trips
                 .Include(t => t.TravelModes)
-                .FirstOrDefaultAsync(t => t.Id == id);
+                .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId.Value);
 
             if (trip == null)
                 return Results.NotFound();
@@ -45,10 +66,18 @@ public static class TripEndpoints
                 trip.Description,
                 TravelModes = trip.TravelModes.Select(x => x.Mode).ToList()
             });
-        });
+        }).RequireAuthorization();
         
-        app.MapPost("/trips", async (AppDbContext db, CreateTripRequest request) =>
+        
+        app.MapPost("/trips", async (AppDbContext db, CreateTripRequest request, ClaimsPrincipal user) =>
         {
+            var userId = GetUserId(user);
+
+            if (userId is null)
+            {
+                return Results.Unauthorized();
+            }
+            
             try
             {
                 if (EndpointValidation.ValidateTitle(request.Title) is { } titleError)
@@ -61,7 +90,8 @@ public static class TripEndpoints
                 {
                     var existingTrip = await db.Trips
                         .Include(t => t.TravelModes)
-                        .FirstOrDefaultAsync(t => t.ClientId == request.ClientId);
+                        .FirstOrDefaultAsync(t => t.ClientId == request.ClientId &&
+                                                  t.UserId == userId.Value);
 
                     if (existingTrip is not null)
                     {
@@ -86,6 +116,7 @@ public static class TripEndpoints
 
                 var trip = new Trip
                 {
+                    UserId = userId.Value,
                     ClientId = string.IsNullOrWhiteSpace(request.ClientId) ? null : request.ClientId,
                     Title = request.Title.Trim(),
                     Destination = request.Destination,
@@ -120,10 +151,18 @@ public static class TripEndpoints
             {
                 return Results.Problem("Could not create trip.");
             }
-        });
+        }).RequireAuthorization();
         
-        app.MapPut("/trips/{id:guid}", async (AppDbContext db, Guid id, UpdateTripRequest request) =>
+        
+        app.MapPut("/trips/{id:guid}", async (AppDbContext db, Guid id, UpdateTripRequest request, ClaimsPrincipal user) =>
         {
+            var userId = GetUserId(user);
+
+            if (userId is null)
+            {
+                return Results.Unauthorized();
+            }
+            
             if (EndpointValidation.ValidateTitle(request.Title) is { } titleError)
                 return titleError;
 
@@ -132,7 +171,7 @@ public static class TripEndpoints
 
             var trip = await db.Trips
                 .Include(t => t.TravelModes)
-                .FirstOrDefaultAsync(t => t.Id == id);
+                .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId.Value);
 
             if (trip is null) return Results.NotFound();
 
@@ -161,15 +200,25 @@ public static class TripEndpoints
                 trip.StartDate,
                 trip.EndDate,
                 trip.Description,
+                trip.CreatedAt,
+                trip.UpdatedAt,
                 TravelModes = trip.TravelModes.Select(x => x.Mode).ToList()
             });
-        });
+        }).RequireAuthorization();
+        
 
-        app.MapDelete("/trips/{id:guid}", async (AppDbContext db, Guid id, IWebHostEnvironment env) =>
+        app.MapDelete("/trips/{id:guid}", async (AppDbContext db, Guid id, IWebHostEnvironment env, ClaimsPrincipal user) =>
         {
+            var userId = GetUserId(user);
+
+            if (userId is null)
+            {
+                return Results.Unauthorized();
+            }
+            
             var trip = await db.Trips
                 .Include(t => t.Photos)
-                .FirstOrDefaultAsync(t => t.Id == id);
+                .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId.Value);
 
             if (trip is null) return Results.NotFound();
 
@@ -186,6 +235,11 @@ public static class TripEndpoints
             db.Trips.Remove(trip);
             await db.SaveChangesAsync();
             return Results.NoContent();
-        });
+        }).RequireAuthorization();
+    }
+    private static Guid? GetUserId(ClaimsPrincipal user)
+    {
+        var value = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(value, out var userId) ? userId : null;
     }
 }

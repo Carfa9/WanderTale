@@ -4,7 +4,7 @@ public class Trip
 {
     public Guid Id { get; set; }
     public string? ClientId { get; set; }
-    public int UserId { get; set; }
+    public Guid UserId { get; set; }
 
     public string Title { get; set; } = null!;
     public string? Destination { get; set; }

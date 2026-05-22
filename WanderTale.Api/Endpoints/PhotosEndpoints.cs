@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
 using WanderTale.Dto;
 using WanderTale.Models;
 
@@ -8,8 +9,12 @@ public static class PhotosEndpoints
 {
     public static void MapPhotosEndpoints(this WebApplication app)
     {
-        app.MapGet("/trips/{tripId:guid}/photos", async (AppDbContext db, Guid tripId) =>
+        app.MapGet("/trips/{tripId:guid}/photos", async (AppDbContext db, Guid tripId, ClaimsPrincipal user) =>
         {
+            var userId = EndpointAuth.GetUserId(user);
+            if (userId is null) return Results.Unauthorized();
+            if (!await EndpointAuth.OwnsTripAsync(db, tripId, userId.Value)) return Results.NotFound();
+
             var photos = await db.Photo
                 .Where(p => p.TripId == tripId)
                 .OrderByDescending(p => p.CreatedAt)
@@ -27,39 +32,54 @@ public static class PhotosEndpoints
                 }).ToListAsync();
 
             return Results.Ok(photos);
-        });
+        }).RequireAuthorization();
 
-        app.MapDelete("/photos/{photoId:guid}", async (AppDbContext db, Guid photoId, IWebHostEnvironment env) =>
-        {
-            var photo = await db.Photo.FindAsync(photoId);
-            if (photo is null) return Results.NotFound();
+        app.MapDelete("/photos/{photoId:guid}",
+            async (AppDbContext db, Guid photoId, IWebHostEnvironment env, ClaimsPrincipal user) =>
+            {
+                var userId = EndpointAuth.GetUserId(user);
+                if (userId is null) return Results.Unauthorized();
 
-            var root = string.IsNullOrWhiteSpace(env.WebRootPath)
-                ? Path.Combine(env.ContentRootPath, "wwwroot")
-                : env.WebRootPath;
-            var filePath = Path.Combine(root, photo.ImageUri.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-            if (File.Exists(filePath)) File.Delete(filePath);
+                var photo = await db.Photo
+                    .Include(p => p.Trip)
+                    .FirstOrDefaultAsync(p => p.Id == photoId && p.Trip.UserId == userId.Value);
+                if (photo is null) return Results.NotFound();
 
-            db.Photo.Remove(photo);
-            await db.SaveChangesAsync();
-            return Results.NoContent();
-        });
+                var root = string.IsNullOrWhiteSpace(env.WebRootPath)
+                    ? Path.Combine(env.ContentRootPath, "wwwroot")
+                    : env.WebRootPath;
+                var filePath = Path.Combine(root, photo.ImageUri.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                if (File.Exists(filePath)) File.Delete(filePath);
+
+                db.Photo.Remove(photo);
+                await db.SaveChangesAsync();
+                return Results.NoContent();
+            }).RequireAuthorization();
 
         app.MapPatch("/photos/{photoId:guid}/caption",
-            async (AppDbContext db, Guid photoId, UpdateCaptionRequest req) =>
+            async (AppDbContext db, Guid photoId, UpdateCaptionRequest req, ClaimsPrincipal user) =>
             {
-                var photo = await db.Photo.FindAsync(photoId);
+                var userId = EndpointAuth.GetUserId(user);
+                if (userId is null) return Results.Unauthorized();
+
+                var photo = await db.Photo
+                    .Include(p => p.Trip)
+                    .FirstOrDefaultAsync(p => p.Id == photoId && p.Trip.UserId == userId.Value);
                 if (photo is null) return Results.NotFound();
 
                 photo.Caption = string.IsNullOrWhiteSpace(req.Caption) ? null : req.Caption.Trim();
                 photo.UpdatedAt = DateTime.UtcNow;
                 await db.SaveChangesAsync();
                 return Results.Ok(new { photo.Id, photo.Caption });
-            });
+            }).RequireAuthorization();
 
         app.MapPost("/trips/{tripId:guid}/photos",
-            async (AppDbContext db, Guid tripId, HttpRequest req, IWebHostEnvironment env) =>
+            async (AppDbContext db, Guid tripId, HttpRequest req, IWebHostEnvironment env, ClaimsPrincipal user) =>
             {
+                var userId = EndpointAuth.GetUserId(user);
+                if (userId is null) return Results.Unauthorized();
+                if (!await EndpointAuth.OwnsTripAsync(db, tripId, userId.Value)) return Results.NotFound();
+
                 var form = await req.ReadFormAsync();
 
                 var file = form.Files["image"];
@@ -70,20 +90,27 @@ public static class PhotosEndpoints
 
                 if (file is null || file.Length == 0)
                     return Results.BadRequest("Ingen bild skickades");
-                
+
                 const long maxFileSize = 5 * 1024 * 1024;
 
                 if (file.Length > maxFileSize)
                     return Results.BadRequest("Bilden får max vara 5 MB");
-                
+
                 var allowedContentTypes = new[] { "image/jpeg", "image/png" };
 
                 if (!allowedContentTypes.Contains(file.ContentType))
                     return Results.BadRequest("Endast JPG och PNG stöds");
 
                 Guid? entryId = null;
-                if (!string.IsNullOrWhiteSpace(entryIdValue) && Guid.TryParse(entryIdValue, out var parsedEntryId))
+                if (!string.IsNullOrWhiteSpace(entryIdValue))
                 {
+                    if (!Guid.TryParse(entryIdValue, out var parsedEntryId))
+                        return Results.BadRequest("Invalid entryId.");
+
+                    var entryBelongsToTrip = await db.Entries
+                        .AnyAsync(e => e.Id == parsedEntryId && e.TripId == tripId);
+                    if (!entryBelongsToTrip) return Results.BadRequest("Entry does not belong to this trip.");
+
                     entryId = parsedEntryId;
                 }
 
@@ -127,6 +154,6 @@ public static class PhotosEndpoints
                 await db.SaveChangesAsync();
 
                 return Results.Ok(photo);
-            });
+            }).RequireAuthorization();
     }
 }

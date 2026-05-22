@@ -12,6 +12,6 @@ public static class ThemeEndpoints
             );
             await File.WriteAllTextAsync(themePath, content);
             return Results.Ok(new { path = themePath });
-        });
+        }).RequireAuthorization();
     }
 }
