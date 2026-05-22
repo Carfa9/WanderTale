@@ -1,5 +1,5 @@
 ﻿import React from "react";
-import {Modal, Pressable, StyleSheet, View} from "react-native";
+import {Keyboard, Modal, Pressable, StyleSheet, View} from "react-native";
 import {AppText} from "@/components/app-text";
 import { Image } from "expo-image";
 import {TravelModeKey} from "@/types/travelMode";
@@ -17,10 +17,14 @@ type Props = {
 export default function TravelModePickerModal({visible, value, onClose, onSelect}: Props) {
     const {theme} = useTheme();
     const styles = createStyles(theme.tokens);
+    const close = () => {
+        Keyboard.dismiss();
+        onClose();
+    };
 
     return (
-        <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-            <Pressable style={styles.backdrop} onPress={onClose}>
+        <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
+            <Pressable style={styles.backdrop} onPress={close}>
             </Pressable>
 
             <View style={styles.sheet}>
@@ -41,7 +45,7 @@ export default function TravelModePickerModal({visible, value, onClose, onSelect
                     })}
                 </View>
                 
-                <Pressable onPress={onClose} style={styles.closeButton}>
+                <Pressable onPress={close} style={styles.closeButton}>
                     <AppText>Stäng</AppText>
                 </Pressable>
             </View>

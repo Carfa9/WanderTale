@@ -1,5 +1,5 @@
 import React from "react";
-import {Pressable, StyleSheet, View} from "react-native";
+import {Keyboard, Pressable, StyleSheet, Text, View} from "react-native";
 import {Ionicons} from "@expo/vector-icons";
 import {Image} from "expo-image";
 import {AppText} from "@/components/app-text";
@@ -19,9 +19,14 @@ export function InlineLabelSelect({label, value = [], onPress}: Props) {
     const styles = createStyles(theme.tokens);
 
     return (
-        <Pressable onPress={onPress}>
+        <Pressable
+            onPress={() => {
+                Keyboard.dismiss();
+                onPress();
+            }}
+        >
             <View style={styles.wrapper}>
-                <AppText style={styles.inlineLabel}>{label}</AppText>
+                <Text style={styles.inlineLabel}>{label}</Text>
                 <View style={styles.valueArea}>
                     {value.length === 0 ? (
                         <AppText style={styles.placeholder}></AppText>
@@ -37,6 +42,7 @@ export function InlineLabelSelect({label, value = [], onPress}: Props) {
                                         source={opt.image}
                                         style={styles.icon}
                                         contentFit="contain"
+                                        tintColor={theme.tokens.textPrimary}
                                     />
                                 );
                             })}
@@ -63,6 +69,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => 
         marginRight: 10,
         fontSize: 18,
         paddingTop: 2,
+        color: theme.textPrimary,
     },
     valueArea: {
         flex: 1,

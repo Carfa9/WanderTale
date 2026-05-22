@@ -1,4 +1,4 @@
-import {KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View} from "react-native";
+import {ImageBackground, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View} from "react-native";
 import {SafeAreaView} from "react-native-safe-area-context";
 import NewTripForm from "@/components/new-trip-form";
 import {AppText} from "@/components/app-text";
@@ -22,7 +22,14 @@ export default function PlanTrip() {
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="interactive">
                     <View style={styles.bottom}>
+                        <ImageBackground
+                            source={require("@/assets/images/TheWorld.png")}
+                            style={styles.background}
+                            imageStyle={styles.backgroundImage}
+                            resizeMode="cover"
+                        >
                         <NewTripForm/>
+                        </ImageBackground>
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -43,5 +50,12 @@ const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => 
     },
     bottom: {
         flex: 4,
+    },
+    background: {
+        flex: 1,
+        backgroundColor: theme.surfaceAlt,
+    },
+    backgroundImage: {
+        opacity: theme.isDark ? 0.18 : 0.62,
     },
 });

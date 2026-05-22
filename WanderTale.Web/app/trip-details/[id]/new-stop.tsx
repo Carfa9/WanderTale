@@ -71,7 +71,7 @@ export default function NewStopScreen() {
                     </Pressable>
                     <AppText size={30}>Nytt stopp</AppText>
                 </View>
-
+            
                 <InlineLabelInput
                     label="Stopp: "
                     value={title}

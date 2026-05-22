@@ -178,6 +178,8 @@ export default function TripDetails() {
                                                 isLongDestinationTitle && styles.destinationTitleLong,
                                             ]}
                                             numberOfLines={1}
+                                            adjustsFontSizeToFit
+                                            minimumFontScale={0.75}
                                         >
                                             {destinationTitle}
                                         </AppText>
@@ -517,8 +519,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => 
     },
 
     destinationTitleLong: {
-        fontSize: 34,
-        lineHeight: 48,
+        fontSize: 30,
+        lineHeight: 42,
     },
 
     tripMenuButton: {

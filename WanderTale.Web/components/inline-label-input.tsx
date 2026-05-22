@@ -1,6 +1,5 @@
 import React from "react";
-import {Keyboard, StyleProp, StyleSheet, TextInput, TextInputProps, TextStyle, View} from "react-native";
-import {AppText} from "@/components/app-text";
+import {Keyboard, StyleProp, StyleSheet, Text, TextInput, TextInputProps, TextStyle, View} from "react-native";
 import {useTheme} from "@/context/ThemeContext";
 
 type Props = {
@@ -29,7 +28,7 @@ export function InlineLabelInput({
 
     return (
         <View style={[styles.wrapper, isMultiline && styles.wrapperMultiline]}>
-            <AppText style={styles.inlineLabel}>{label}</AppText>
+            <Text style={styles.inlineLabel}>{label}</Text>
 
             <TextInput
                 style={[styles.input, isMultiline && styles.textarea, inputStyles]}
@@ -67,9 +66,11 @@ const createStyles = (theme: ReturnType<typeof useTheme>["theme"]["tokens"]) => 
         marginRight: 10,
         fontSize: 18,
         paddingTop: 2,
+        color: theme.textPrimary,
     },
     input: {
         flex: 1,
+        fontFamily: "IndieFlower",
         fontSize: 18,
         paddingVertical: 0,
         color: theme.textPrimary,
