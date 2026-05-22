@@ -88,6 +88,21 @@ public sealed class EntriesEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateEntry_WhenContentIsBlank_ReturnsBadRequest()
+    {
+        var tripId = await CreateTrip();
+        var request = new CreateEntryRequest(
+            new DateTime(2026, 4, 1),
+            "Trip entry",
+            "   "
+        );
+
+        var response = await _client.PostAsJsonAsync($"/trips/{tripId}/entries", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetEntries_WhenEntriesExist_ReturnsEntriesOrderedByEntryDateDescending()
     {
         var tripId = await CreateTrip();

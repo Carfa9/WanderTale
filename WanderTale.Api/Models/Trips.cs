@@ -35,11 +35,11 @@ public class Entry
     public Guid Id { get; set; }
     public Guid TripId { get; set; }
     public DateTime? EntryDate { get; set; }
-    public string Title { get; set; }
-    public string Content { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-    public Trip Trip { get; set; }
+    public Trip Trip { get; set; } = null!;
 }
 
 public class Photo
@@ -48,7 +48,7 @@ public class Photo
     public Guid TripId { get; set; }
     public Guid? EntryId { get; set; }
 
-    public string ImageUri { get; set; }
+    public string ImageUri { get; set; } = string.Empty;
     public string? Caption { get; set; }
     public DateTime? PhotoDate { get; set; }
     public string? Location { get; set; }
@@ -56,7 +56,7 @@ public class Photo
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
-    public Trip Trip { get; set; }
+    public Trip Trip { get; set; } = null!;
 }
 
 public class Stop

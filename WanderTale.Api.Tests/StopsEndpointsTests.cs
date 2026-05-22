@@ -114,6 +114,25 @@ public sealed class StopsEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateStop_WhenEndDateIsBeforeStartDate_ReturnsBadRequest()
+    {
+        var tripId = await CreateTrip();
+
+        var request = new CreateStopRequest(
+            "Kyoto",
+            "Stop",
+            new DateTime(2026, 4, 15),
+            new DateTime(2026, 4, 2),
+            "Japan",
+            ["Train"]
+        );
+
+        var response = await _client.PostAsJsonAsync($"/trips/{tripId}/stops", request);
+
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task CreateStop_WhenMultipleStopsExist_AssignsIncrementingOrderIndex()
     {
         var tripId = await CreateTrip();
@@ -188,6 +207,74 @@ public sealed class StopsEndpointsTests : IDisposable
         Assert.Equal(1, stops[0].OrderIndex);
         Assert.Equal("Osaka", stops[1].Title);
         Assert.Equal(2, stops[1].OrderIndex);
+    }
+
+    [Fact]
+    public async Task UpdateStop_WhenStopExists_ReturnsUpdatedStop()
+    {
+        var tripId = await CreateTrip();
+        var createRequest = new CreateStopRequest(
+            "Kyoto",
+            "Stop",
+            new DateTime(2026, 4, 2),
+            new DateTime(2026, 4, 4),
+            "Japan",
+            ["Train"]
+        );
+        var createResponse = await _client.PostAsJsonAsync($"/trips/{tripId}/stops", createRequest);
+        var created = await createResponse.Content.ReadFromJsonAsync<StopResponse>();
+
+        Assert.NotNull(created);
+
+        var updateRequest = new UpdateStopRequest(
+            "Osaka",
+            "Updated stop",
+            new DateTime(2026, 4, 5),
+            new DateTime(2026, 4, 7),
+            "Japan",
+            3,
+            ["Plane"]
+        );
+
+        var updateResponse = await _client.PutAsJsonAsync($"/stops/{created.Id}", updateRequest);
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, updateResponse.StatusCode);
+
+        var updated = await updateResponse.Content.ReadFromJsonAsync<StopResponse>();
+
+        Assert.NotNull(updated);
+        Assert.Equal(created.Id, updated.Id);
+        Assert.Equal("Osaka", updated.Title);
+        Assert.Equal("Updated stop", updated.Description);
+        Assert.Equal(3, updated.OrderIndex);
+        Assert.Equal(["Plane"], updated.TravelModes);
+    }
+
+    [Fact]
+    public async Task DeleteStop_WhenStopExists_ReturnsNoContentAndStopIsRemoved()
+    {
+        var tripId = await CreateTrip();
+        var createRequest = new CreateStopRequest(
+            "Kyoto",
+            "Stop",
+            new DateTime(2026, 4, 2),
+            new DateTime(2026, 4, 4),
+            "Japan",
+            ["Train"]
+        );
+        var createResponse = await _client.PostAsJsonAsync($"/trips/{tripId}/stops", createRequest);
+        var created = await createResponse.Content.ReadFromJsonAsync<StopResponse>();
+
+        Assert.NotNull(created);
+
+        var deleteResponse = await _client.DeleteAsync($"/stops/{created.Id}");
+
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        var stops = await _client.GetFromJsonAsync<List<StopResponse>>($"/trips/{tripId}/stops");
+
+        Assert.NotNull(stops);
+        Assert.DoesNotContain(stops, stop => stop.Id == created.Id);
     }
 
     private sealed record TripResponse(

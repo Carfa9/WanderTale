@@ -21,6 +21,12 @@ public static class EntriesEndpoints
 
         app.MapPost("/trips/{tripId:guid}/entries", async (AppDbContext db, Guid tripId, CreateEntryRequest req) =>
             {
+                if (EndpointValidation.ValidateTitle(req.Title) is { } titleError)
+                    return titleError;
+
+                if (EndpointValidation.ValidateRequiredText(req.Content, "content", "Content is required.") is { } contentError)
+                    return contentError;
+
                 var now = DateTime.UtcNow;
 
                 var entry = new Entry
@@ -28,8 +34,8 @@ public static class EntriesEndpoints
                     Id = Guid.NewGuid(),
                     TripId = tripId,
                     EntryDate = req.EntryDate,
-                    Title = req.Title,
-                    Content = req.Content,
+                    Title = req.Title.Trim(),
+                    Content = req.Content.Trim(),
                     CreatedAt = now,
                     UpdatedAt = now
                 };
@@ -43,12 +49,18 @@ public static class EntriesEndpoints
 
         app.MapPut("/entries/{entryId:guid}", async (AppDbContext db, Guid entryId, UpdateEntryRequest req) =>
         {
+            if (EndpointValidation.ValidateTitle(req.Title) is { } titleError)
+                return titleError;
+
+            if (EndpointValidation.ValidateRequiredText(req.Content, "content", "Content is required.") is { } contentError)
+                return contentError;
+
             var entry = await db.Entries.FindAsync(entryId);
             if (entry is null) return Results.NotFound();
 
             entry.EntryDate = req.EntryDate;
-            entry.Title = req.Title;
-            entry.Content = req.Content;
+            entry.Title = req.Title.Trim();
+            entry.Content = req.Content.Trim();
             entry.UpdatedAt = DateTime.UtcNow;
 
             await db.SaveChangesAsync();

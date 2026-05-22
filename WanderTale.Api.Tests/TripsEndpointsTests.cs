@@ -91,6 +91,40 @@ public sealed class TripsEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateTrip_WhenTitleIsBlank_ReturnsBadRequest()
+    {
+        var request = new CreateTripRequest(
+            "   ",
+            "Japan",
+            "Spring trip",
+            new DateTime(2026, 4, 1),
+            new DateTime(2026, 4, 14),
+            ["Plane"]
+        );
+
+        var response = await _client.PostAsJsonAsync("/trips", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateTrip_WhenEndDateIsBeforeStartDate_ReturnsBadRequest()
+    {
+        var request = new CreateTripRequest(
+            "Tokyo",
+            "Japan",
+            "Spring trip",
+            new DateTime(2026, 4, 14),
+            new DateTime(2026, 4, 1),
+            ["Plane"]
+        );
+
+        var response = await _client.PostAsJsonAsync("/trips", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task UpdateTrip_WhenTripsExist_ReturnsUpdatedTrip()
     {
         var request = new CreateTripRequest(
