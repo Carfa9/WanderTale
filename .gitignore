@@ -49,6 +49,7 @@ node_modules/
 .expo/
 .expo-shared/
 .expo-dev/
+WanderTale.Web/.jest-cache/
 
 # Build output
 dist/
