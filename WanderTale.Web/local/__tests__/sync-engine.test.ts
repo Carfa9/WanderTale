@@ -14,7 +14,13 @@ import {
     markLocalTripDeleteSynced,
     markLocalTripSynced,
 } from "@/local/trips-repo";
-import {getLocalStopForSync, getStopServerId, markLocalStopSynced} from "@/local/stops-repo";
+import {
+    getLocalStopForSync,
+    getSoftDeletedLocalStopId,
+    getStopServerId,
+    hardDeleteLocalStop,
+    markLocalStopSynced,
+} from "@/local/stops-repo";
 import {Trip} from "@/types/trip";
 import {Stop} from "@/types/stop";
 
@@ -54,7 +60,9 @@ jest.mock("@/local/trips-repo", () => ({
 
 jest.mock("@/local/stops-repo", () => ({
     getLocalStopForSync: jest.fn(),
+    getSoftDeletedLocalStopId: jest.fn(),
     getStopServerId: jest.fn(),
+    hardDeleteLocalStop: jest.fn(),
     markLocalStopSynced: jest.fn(),
 }));
 
@@ -76,12 +84,14 @@ jest.mock("@/local/photos-repo", () => ({
 
 const apiFetchMock = jest.mocked(apiFetch);
 const getLocalStopForSyncMock = jest.mocked(getLocalStopForSync);
+const getSoftDeletedLocalStopIdMock = jest.mocked(getSoftDeletedLocalStopId);
 const getLocalTripByIdMock = jest.mocked(getLocalTripById);
 const getPendingSyncQueueMock = jest.mocked(getPendingSyncQueue);
 const getSoftDeletedLocalTripIdMock = jest.mocked(getSoftDeletedLocalTripId);
 const getStopServerIdMock = jest.mocked(getStopServerId);
 const getTripServerIdMock = jest.mocked(getTripServerId);
 const markLocalStopSyncedMock = jest.mocked(markLocalStopSynced);
+const hardDeleteLocalStopMock = jest.mocked(hardDeleteLocalStop);
 const markLocalTripDeleteSyncedMock = jest.mocked(markLocalTripDeleteSynced);
 const markLocalTripSyncedMock = jest.mocked(markLocalTripSynced);
 const markSyncQueueItemErrorMock = jest.mocked(markSyncQueueItemError);
@@ -142,7 +152,9 @@ describe("processPendingSyncQueue", () => {
         markLocalTripSyncedMock.mockResolvedValue(undefined);
         markLocalTripDeleteSyncedMock.mockResolvedValue(undefined);
         markLocalStopSyncedMock.mockResolvedValue(undefined);
+        hardDeleteLocalStopMock.mockResolvedValue(undefined);
         getSoftDeletedLocalTripIdMock.mockResolvedValue(null);
+        getSoftDeletedLocalStopIdMock.mockResolvedValue(null);
         getStopServerIdMock.mockResolvedValue(null);
     });
 
@@ -255,6 +267,79 @@ describe("processPendingSyncQueue", () => {
             }),
         });
         expect(markLocalStopSyncedMock).toHaveBeenCalledWith("stop_local_1", serverStop);
+        expect(markSyncQueueItemSyncedMock).toHaveBeenCalledWith("sync_1");
+    });
+
+    it("updates stops through the stop endpoint", async () => {
+        getPendingSyncQueueMock.mockResolvedValueOnce([
+            queueItem({
+                entity_type: "stop",
+                entity_local_id: "stop_local_1",
+                operation: "update",
+                payload: JSON.stringify({
+                    title: "Osaka",
+                    country: "Japan",
+                    travelModes: ["train"],
+                }),
+            }),
+        ]);
+        getStopServerIdMock.mockResolvedValueOnce("server_stop_1");
+        getLocalStopForSyncMock.mockResolvedValueOnce({
+            stop: {...serverStop, id: "server_stop_1", title: "Osaka"},
+            tripLocalId: "trip_local_1",
+        });
+        apiFetchMock.mockResolvedValueOnce({...serverStop, title: "Osaka"});
+
+        await processPendingSyncQueue();
+
+        expect(apiFetchMock).toHaveBeenCalledWith("/stops/server_stop_1", {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                title: "Osaka",
+                country: "Japan",
+                travelModes: ["train"],
+            }),
+        });
+        expect(markLocalStopSyncedMock).toHaveBeenCalledWith("stop_local_1", {...serverStop, title: "Osaka"});
+        expect(markSyncQueueItemSyncedMock).toHaveBeenCalledWith("sync_1");
+    });
+
+    it("deletes synced stops and hard deletes the local row", async () => {
+        getPendingSyncQueueMock.mockResolvedValueOnce([
+            queueItem({
+                entity_type: "stop",
+                entity_local_id: "stop_local_1",
+                operation: "delete",
+                payload: "{}",
+            }),
+        ]);
+        getStopServerIdMock.mockResolvedValueOnce("server_stop_1");
+        apiFetchMock.mockResolvedValueOnce(undefined);
+
+        await processPendingSyncQueue();
+
+        expect(apiFetchMock).toHaveBeenCalledWith("/stops/server_stop_1", {method: "DELETE"});
+        expect(hardDeleteLocalStopMock).toHaveBeenCalledWith("stop_local_1");
+        expect(markSyncQueueItemSyncedMock).toHaveBeenCalledWith("sync_1");
+    });
+
+    it("hard deletes soft-deleted unsynced stops without posting create", async () => {
+        getPendingSyncQueueMock.mockResolvedValueOnce([
+            queueItem({
+                entity_type: "stop",
+                entity_local_id: "stop_local_1",
+                operation: "create",
+            }),
+        ]);
+        getStopServerIdMock.mockResolvedValueOnce(null);
+        getLocalStopForSyncMock.mockResolvedValueOnce(null);
+        getSoftDeletedLocalStopIdMock.mockResolvedValueOnce("stop_local_1");
+
+        await processPendingSyncQueue();
+
+        expect(apiFetchMock).not.toHaveBeenCalled();
+        expect(hardDeleteLocalStopMock).toHaveBeenCalledWith("stop_local_1");
         expect(markSyncQueueItemSyncedMock).toHaveBeenCalledWith("sync_1");
     });
 

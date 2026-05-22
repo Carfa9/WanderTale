@@ -1,10 +1,14 @@
 import {apiFetch} from "@/api/http";
-import {createStop, getStopsByTripId} from "@/api/stops";
+import {createStop, deleteStop, getStopsByTripId, updateStop} from "@/api/stops";
 import {processPendingSyncQueue} from "@/local/sync-engine";
 import {enqueueSyncOperation} from "@/local/sync-queue";
 import {
+    getStopLocalId,
+    getStopServerId,
     getLocalStopsByTripId,
     insertLocalStop,
+    markLocalStopDeleted,
+    updateLocalStop,
     upsertStopsFromServer,
 } from "@/local/stops-repo";
 import {getTripLocalId, getTripServerId} from "@/local/trips-repo";
@@ -23,8 +27,12 @@ jest.mock("@/local/sync-queue", () => ({
 }));
 
 jest.mock("@/local/stops-repo", () => ({
+    getStopLocalId: jest.fn(),
+    getStopServerId: jest.fn(),
     getLocalStopsByTripId: jest.fn(),
     insertLocalStop: jest.fn(),
+    markLocalStopDeleted: jest.fn(),
+    updateLocalStop: jest.fn(),
     upsertStopsFromServer: jest.fn(),
 }));
 
@@ -36,10 +44,14 @@ jest.mock("@/local/trips-repo", () => ({
 const apiFetchMock = jest.mocked(apiFetch);
 const enqueueSyncOperationMock = jest.mocked(enqueueSyncOperation);
 const getLocalStopsByTripIdMock = jest.mocked(getLocalStopsByTripId);
+const getStopLocalIdMock = jest.mocked(getStopLocalId);
+const getStopServerIdMock = jest.mocked(getStopServerId);
 const getTripLocalIdMock = jest.mocked(getTripLocalId);
 const getTripServerIdMock = jest.mocked(getTripServerId);
 const insertLocalStopMock = jest.mocked(insertLocalStop);
+const markLocalStopDeletedMock = jest.mocked(markLocalStopDeleted);
 const processPendingSyncQueueMock = jest.mocked(processPendingSyncQueue);
+const updateLocalStopMock = jest.mocked(updateLocalStop);
 const upsertStopsFromServerMock = jest.mocked(upsertStopsFromServer);
 
 const localStop: Stop = {
@@ -139,6 +151,63 @@ describe("createStop", () => {
             "create",
             {...dto, clientId: localStop.id}
         );
+        expect(processPendingSyncQueueMock).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("updateStop", () => {
+    const dto: CreateStopDto = {
+        title: "Osaka",
+        description: "Food day",
+        startDate: "2026-05-04T00:00:00.000Z",
+        endDate: "2026-05-05T00:00:00.000Z",
+        country: "Japan",
+        travelModes: ["train"],
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        updateLocalStopMock.mockResolvedValue({...localStop, ...dto});
+        getStopLocalIdMock.mockResolvedValue("stop_local_1");
+        processPendingSyncQueueMock.mockResolvedValue(undefined);
+    });
+
+    it("updates locally and queues a stop update", async () => {
+        const result = await updateStop("server_stop_1", dto);
+
+        expect(result.title).toBe("Osaka");
+        expect(updateLocalStopMock).toHaveBeenCalledWith("server_stop_1", dto);
+        expect(getStopLocalIdMock).toHaveBeenCalledWith("server_stop_1");
+        expect(enqueueSyncOperationMock).toHaveBeenCalledWith("stop", "stop_local_1", "update", dto);
+        expect(processPendingSyncQueueMock).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("deleteStop", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        processPendingSyncQueueMock.mockResolvedValue(undefined);
+    });
+
+    it("marks the stop deleted and queues delete when it has a server id", async () => {
+        markLocalStopDeletedMock.mockResolvedValue("stop_local_1");
+        getStopServerIdMock.mockResolvedValue("server_stop_1");
+
+        await deleteStop("server_stop_1");
+
+        expect(markLocalStopDeletedMock).toHaveBeenCalledWith("server_stop_1");
+        expect(getStopServerIdMock).toHaveBeenCalledWith("stop_local_1");
+        expect(enqueueSyncOperationMock).toHaveBeenCalledWith("stop", "stop_local_1", "delete", {});
+        expect(processPendingSyncQueueMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not queue delete for an unsynced local stop", async () => {
+        markLocalStopDeletedMock.mockResolvedValue("stop_local_1");
+        getStopServerIdMock.mockResolvedValue(null);
+
+        await deleteStop("stop_local_1");
+
+        expect(enqueueSyncOperationMock).not.toHaveBeenCalled();
         expect(processPendingSyncQueueMock).toHaveBeenCalledTimes(1);
     });
 });

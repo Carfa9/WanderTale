@@ -2,8 +2,12 @@ import {apiFetch} from "@/api/http";
 import {enqueueSyncOperation} from "@/local/sync-queue";
 import {processPendingSyncQueue} from "@/local/sync-engine";
 import {
+    getStopLocalId,
+    getStopServerId,
     getLocalStopsByTripId,
     insertLocalStop,
+    markLocalStopDeleted,
+    updateLocalStop,
     upsertStopsFromServer,
 } from "@/local/stops-repo";
 import {getTripLocalId, getTripServerId} from "@/local/trips-repo";
@@ -53,4 +57,31 @@ export async function createStop(tripId: string, dto: CreateStopDto): Promise<St
     processPendingSyncQueue().catch(() => {});
 
     return localStop;
+}
+
+export async function updateStop(id: string, dto: CreateStopDto): Promise<Stop> {
+    const localStop = await updateLocalStop(id, dto);
+    const localId = await getStopLocalId(id);
+    
+    if (localId) {
+        await enqueueSyncOperation("stop", localId, "update", dto);
+    }
+
+    processPendingSyncQueue().catch(() => {});
+    
+    return localStop;
+}
+
+export async function deleteStop(id: string): Promise<void> {
+    const localId = await markLocalStopDeleted(id);
+    
+    if (!localId) return;
+    
+    const serverId = await getStopServerId(localId);
+    
+    if (serverId) {
+        await enqueueSyncOperation("stop", localId, "delete", {});
+    }
+    
+    processPendingSyncQueue().catch(() => {});
 }

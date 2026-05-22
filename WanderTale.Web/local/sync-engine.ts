@@ -13,7 +13,13 @@ import {
     hardDeleteLocalPhoto,
     markLocalPhotoSynced,
 } from "@/local/photos-repo";
-import {getLocalStopForSync, getStopServerId, markLocalStopSynced} from "@/local/stops-repo";
+import {
+    getLocalStopForSync,
+    getSoftDeletedLocalStopId,
+    getStopServerId,
+    hardDeleteLocalStop,
+    markLocalStopSynced,
+} from "@/local/stops-repo";
 import {
     getLocalTripById,
     getSoftDeletedLocalTripId,
@@ -118,6 +124,11 @@ async function syncStopCreate(item: SyncQueueItem): Promise<void> {
     const localStop = await getLocalStopForSync(item.entity_local_id);
 
     if (!localStop) {
+        const softDeleted = await getSoftDeletedLocalStopId(item.entity_local_id);
+        if (softDeleted) {
+            await hardDeleteLocalStop(softDeleted);
+            return;
+        }
         throw new Error(`Local stop not found: ${item.entity_local_id}`);
     }
 
@@ -133,7 +144,57 @@ async function syncStopCreate(item: SyncQueueItem): Promise<void> {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({...dto, clientId: dto.clientId ?? item.entity_local_id}),
     });
+
+    const softDeletedAfter = await getSoftDeletedLocalStopId(item.entity_local_id);
+    if (softDeletedAfter) {
+        try {
+            await apiFetch<void>(`/stops/${serverStop.id}`, {method: "DELETE"});
+        } catch (error) {
+            if (!isNotFound(error)) throw error;
+        }
+        await hardDeleteLocalStop(softDeletedAfter);
+        return;
+    }
+
     await markLocalStopSynced(item.entity_local_id, serverStop);
+}
+
+async function syncStopUpdate(item: SyncQueueItem): Promise<void> {
+    const stopServerId = await getStopServerId(item.entity_local_id);
+
+    if (!stopServerId) {
+        throw new Error(`Stop is not synced yet: ${item.entity_local_id}`);
+    }
+
+    const localStop = await getLocalStopForSync(item.entity_local_id);
+
+    if (!localStop) {
+        const softDeleted = await getSoftDeletedLocalStopId(item.entity_local_id);
+        if (softDeleted) return;
+        throw new Error(`Local stop not found: ${item.entity_local_id}`);
+    }
+
+    const dto: CreateStopDto = JSON.parse(item.payload);
+    const serverStop = await apiFetch<Stop>(`/stops/${stopServerId}`, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(dto),
+    });
+    await markLocalStopSynced(item.entity_local_id, serverStop);
+}
+
+async function syncStopDelete(item: SyncQueueItem): Promise<void> {
+    const stopServerId = await getStopServerId(item.entity_local_id);
+
+    if (stopServerId) {
+        try {
+            await apiFetch<void>(`/stops/${stopServerId}`, {method: "DELETE"});
+        } catch (error) {
+            if (!isNotFound(error)) throw error;
+        }
+    }
+
+    await hardDeleteLocalStop(item.entity_local_id);
 }
 
 async function syncEntryCreate(item: SyncQueueItem): Promise<void> {
@@ -325,6 +386,18 @@ export async function processPendingSyncQueue(): Promise<void> {
 
                 if (item.entity_type === "stop" && item.operation === "create") {
                     await syncStopCreate(item);
+                    await markSyncQueueItemSynced(item.id);
+                    continue;
+                }
+
+                if (item.entity_type === "stop" && item.operation === "update") {
+                    await syncStopUpdate(item);
+                    await markSyncQueueItemSynced(item.id);
+                    continue;
+                }
+
+                if (item.entity_type === "stop" && item.operation === "delete") {
+                    await syncStopDelete(item);
                     await markSyncQueueItemSynced(item.id);
                     continue;
                 }

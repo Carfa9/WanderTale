@@ -137,6 +137,22 @@ export async function getStopServerId(localId: string): Promise<string | null> {
     return row?.server_id ?? null;
 }
 
+export async function getStopLocalId(id: string): Promise<string | null> {
+    const db = await getDB();
+    const row = await db.getFirstAsync<{local_id: string}>(
+        `
+        SELECT local_id
+        FROM stops
+        WHERE deleted_at IS NULL
+          AND (local_id = ? OR server_id = ?)
+        LIMIT 1
+    `,
+        [id, id]
+    );
+
+    return row?.local_id ?? null;
+}
+
 export async function insertLocalStop(tripId: string, dto: CreateStopDto): Promise<Stop> {
     const db = await getDB();
     const tripLocalId = await getTripLocalId(tripId);
@@ -189,6 +205,119 @@ export async function insertLocalStop(tripId: string, dto: CreateStopDto): Promi
     };
 }
 
+export async function updateLocalStop(id: string, dto: CreateStopDto): Promise<Stop> {
+    const db = await getDB();
+    const localId = await getStopLocalId(id);
+
+    if (!localId) {
+        throw new Error(`Stop not found locally: ${id}`);
+    }
+
+    const row = await db.getFirstAsync<StopRow>(`
+        SELECT
+            s.local_id,
+            s.server_id,
+            s.trip_local_id,
+            t.server_id AS trip_server_id,
+            s.title,
+            s.description,
+            s.start_date,
+            s.end_date,
+            s.country,
+            s.order_index,
+            s.created_at,
+            s.updated_at
+        FROM stops s
+        INNER JOIN trips t ON t.local_id = s.trip_local_id
+        WHERE s.local_id = ?
+          AND s.deleted_at IS NULL
+        LIMIT 1
+    `, [localId]);
+
+    if (!row) {
+        throw new Error(`Stop not found locally: ${id}`);
+    }
+
+    const timestamp = nowIso();
+
+    await db.withTransactionAsync(async () => {
+        await db.runAsync(`
+            UPDATE stops
+            SET title = ?,
+                description = ?,
+                start_date = ?,
+                end_date = ?,
+                country = ?,
+                sync_status = 'pending',
+                updated_at = ?
+            WHERE local_id = ?
+              AND deleted_at IS NULL
+        `, [
+            dto.title,
+            dto.description ?? null,
+            dto.startDate ?? null,
+            dto.endDate ?? null,
+            dto.country ?? null,
+            timestamp,
+            localId,
+        ]);
+
+        await replaceStopTravelModes(localId, dto.travelModes ?? [], "pending");
+    });
+
+    return {
+        id,
+        clientId: localId,
+        tripId: row.trip_server_id ?? row.trip_local_id,
+        title: dto.title,
+        description: dto.description ?? null,
+        startDate: dto.startDate ?? null,
+        endDate: dto.endDate ?? null,
+        country: dto.country ?? null,
+        orderIndex: row.order_index,
+        createdAt: row.created_at,
+        updatedAt: timestamp,
+        travelModes: dto.travelModes ?? [],
+    };
+}
+
+export async function markLocalStopDeleted(id: string): Promise<string | null> {
+    const db = await getDB();
+    const localId = await getStopLocalId(id);
+
+    if (!localId) return null;
+
+    const timestamp = nowIso();
+
+    await db.runAsync(`
+        UPDATE stops
+        SET deleted_at = ?,
+            sync_status = 'pending',
+            updated_at = ?
+        WHERE local_id = ?
+    `, [timestamp, timestamp, localId]);
+
+    return localId;
+}
+
+export async function hardDeleteLocalStop(localId: string): Promise<void> {
+    const db = await getDB();
+    await db.runAsync(`DELETE FROM stops WHERE local_id = ?`, [localId]);
+}
+
+export async function getSoftDeletedLocalStopId(localId: string): Promise<string | null> {
+    const db = await getDB();
+    const row = await db.getFirstAsync<{local_id: string}>(`
+        SELECT local_id
+        FROM stops
+        WHERE local_id = ?
+          AND deleted_at IS NOT NULL
+        LIMIT 1
+    `, [localId]);
+
+    return row?.local_id ?? null;
+}
+
 export async function markLocalStopSynced(localId: string, serverStop: Stop): Promise<void> {
     const db = await getDB();
     const timestamp = nowIso();
@@ -232,15 +361,37 @@ export async function upsertStopFromServer(tripId: string, stop: Stop): Promise<
     }
 
     const timestamp = nowIso();
-    const existing = await db.getFirstAsync<{local_id: string}>(
+    const existing = await db.getFirstAsync<{
+        local_id: string;
+        server_id: string | null;
+        sync_status: SyncStatus;
+        deleted_at: string | null;
+    }>(
         `
-        SELECT local_id
+        SELECT local_id, server_id, sync_status, deleted_at
         FROM stops
         WHERE server_id = ? OR local_id = ? OR local_id = ?
         LIMIT 1
     `,
         [stop.id, stop.id, stop.clientId ?? ""]
     );
+
+    if (existing?.deleted_at) {
+        return;
+    }
+
+    if (existing && (existing.sync_status === "pending" || existing.sync_status === "error")) {
+        if (!existing.server_id) {
+            await db.runAsync(`
+                UPDATE stops
+                SET server_id = ?,
+                    updated_at = ?
+                WHERE local_id = ?
+                  AND server_id IS NULL
+            `, [stop.id, timestamp, existing.local_id]);
+        }
+        return;
+    }
 
     const localId = existing?.local_id ?? createLocalId("stop");
 
