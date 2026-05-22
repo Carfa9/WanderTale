@@ -9,9 +9,12 @@ using WanderTale.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var connectionString = builder.Configuration.GetConnectionString("Default")
+                       ?? "Data Source=wanderTale.db";
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options
-        .UseSqlite("Data Source=wanderTale.db")
+        .UseSqlite(connectionString)
         .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning)));
 
 builder.Services.AddEndpointsApiExplorer();
@@ -24,14 +27,28 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy
-            .AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
+        if (allowedOrigins.Length > 0)
+        {
+            policy
+                .WithOrigins(allowedOrigins)
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        }
+        else if (builder.Environment.IsDevelopment())
+        {
+            policy
+                .WithOrigins("https://example.invalid")
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        }
     });
 });
 
@@ -41,15 +58,21 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
-    EnsureSyncSchema(db);
+
+    // Keeps older SQLite databases from before the sync migrations usable.
+    // New schema changes should be made through EF migrations.
+    EnsureLegacySyncSchema(db);
 }
 
 app.UseCors("AllowFrontend");
 
 app.UseStaticFiles();
 
-app.UseSwagger();
-app.UseSwaggerUI(c => { c.SwaggerEndpoint("/swagger/v1/swagger.json", "WanderTale API v1"); });
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c => { c.SwaggerEndpoint("/swagger/v1/swagger.json", "WanderTale API v1"); });
+}
 
 app.MapTripEndpoints();
 app.MapStopEndpoints();
@@ -59,7 +82,7 @@ app.MapThemesEndpoints();
 
 app.Run();
 
-static void EnsureSyncSchema(AppDbContext db)
+static void EnsureLegacySyncSchema(AppDbContext db)
 {
     if (!ColumnExists(db, "Trips", "ClientId"))
     {
