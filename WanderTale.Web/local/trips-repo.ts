@@ -1,6 +1,7 @@
 import {CreateTripDto, Trip} from "@/types/trip";
 import {TravelModeKey} from "@/types/travelMode";
 import {getDB} from "./db";
+import {requireCurrentOwnerEmail} from "@/local/account";
 
 type TripRow = {
     local_id: string;
@@ -41,12 +42,14 @@ function tripFromRow(row: TripRow, travelModes: TravelModeKey[]): Trip {
 
 export async function getLocalTrips(): Promise<Trip[]> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
     const rows = await db.getAllAsync<TripRow>(`
         SELECT local_id, server_id, title, destination, start_date, end_date, description
         FROM trips
         WHERE deleted_at IS NULL
+          AND owner_email = ?
         ORDER BY COALESCE(start_date, created_at) ASC
-    `);
+    `, [ownerEmail]);
 
     return Promise.all(
         rows.map(async row =>
@@ -57,13 +60,15 @@ export async function getLocalTrips(): Promise<Trip[]> {
 
 export async function getLocalTripById(id: string): Promise<Trip | null> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
     const row = await db.getFirstAsync<TripRow>(`
         SELECT local_id, server_id, title, destination, start_date, end_date, description
         FROM trips
         WHERE deleted_at IS NULL
+          AND owner_email = ?
           AND (local_id = ? OR server_id = ?)
         LIMIT 1
-    `, [id, id]);
+    `, [ownerEmail, id, id]);
 
     if (!row) return null;
     return tripFromRow(row, await getLocalTripTravelModes(row.local_id));
@@ -71,13 +76,15 @@ export async function getLocalTripById(id: string): Promise<Trip | null> {
 
 export async function getTripLocalId(id: string): Promise<string | null> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
     const row = await db.getFirstAsync<{local_id: string}>(`
         SELECT local_id
         FROM trips
         WHERE deleted_at IS NULL
+          AND owner_email = ?
           AND (local_id = ? OR server_id = ?)
         LIMIT 1
-    `, [id, id]);
+    `, [ownerEmail, id, id]);
 
     return row?.local_id ?? null;
 }
@@ -96,6 +103,7 @@ export async function getTripServerId(localId: string): Promise<string | null> {
 
 export async function insertLocalTrip(dto: CreateTripDto): Promise<Trip> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
     const localId = createLocalId("trip");
     const timestamp = nowIso();
 
@@ -103,9 +111,9 @@ export async function insertLocalTrip(dto: CreateTripDto): Promise<Trip> {
         await db.runAsync(`
             INSERT INTO trips (
                 local_id, server_id, title, destination, start_date, end_date,
-                description, sync_status, created_at, updated_at, deleted_at
+                description, sync_status, created_at, updated_at, deleted_at, owner_email
             )
-            VALUES (?, NULL, ?, ?, ?, ?, ?, 'pending', ?, ?, NULL)
+            VALUES (?, NULL, ?, ?, ?, ?, ?, 'pending', ?, ?, NULL, ?)
         `, [
             localId,
             dto.title,
@@ -115,6 +123,7 @@ export async function insertLocalTrip(dto: CreateTripDto): Promise<Trip> {
             dto.description ?? null,
             timestamp,
             timestamp,
+            ownerEmail,
         ]);
 
         await replaceTripTravelModes(localId, dto.travelModes ?? [], "pending");
@@ -230,17 +239,20 @@ export async function getSoftDeletedLocalTripId(localId: string): Promise<string
 
 async function getSoftDeletedTripBySignature(trip: Trip): Promise<{local_id: string} | null> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
 
     return db.getFirstAsync<{local_id: string}>(`
         SELECT local_id
         FROM trips
         WHERE deleted_at IS NOT NULL
+          AND owner_email = ?
           AND title = ?
           AND COALESCE(destination, '') = COALESCE(?, '')
           AND COALESCE(start_date, '') = COALESCE(?, '')
           AND COALESCE(end_date, '') = COALESCE(?, '')
         LIMIT 1
     `, [
+        ownerEmail,
         trip.title,
         trip.destination ?? null,
         trip.startDate ?? null,
@@ -282,6 +294,7 @@ export async function markLocalTripSynced(localId: string, serverTrip: Trip): Pr
 
 export async function upsertTripFromServer(trip: Trip): Promise<void> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
     const timestamp = nowIso();
     const existing = await db.getFirstAsync<{
         local_id: string;
@@ -291,9 +304,10 @@ export async function upsertTripFromServer(trip: Trip): Promise<void> {
     }>(`
         SELECT local_id, server_id, sync_status, deleted_at
         FROM trips
-        WHERE server_id = ? OR local_id = ? OR local_id = ?
+        WHERE owner_email = ?
+          AND (server_id = ? OR local_id = ? OR local_id = ?)
         LIMIT 1
-    `, [trip.id, trip.id, trip.clientId ?? ""]);
+    `, [ownerEmail, trip.id, trip.id, trip.clientId ?? ""]);
 
     if (existing?.deleted_at) {
         return;
@@ -327,9 +341,9 @@ export async function upsertTripFromServer(trip: Trip): Promise<void> {
         await db.runAsync(`
             INSERT INTO trips (
                 local_id, server_id, title, destination, start_date, end_date,
-                description, sync_status, created_at, updated_at, deleted_at
+                description, sync_status, created_at, updated_at, deleted_at, owner_email
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, NULL)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, NULL, ?)
             ON CONFLICT(local_id) DO UPDATE SET
                 server_id = excluded.server_id,
                 title = excluded.title,
@@ -339,7 +353,8 @@ export async function upsertTripFromServer(trip: Trip): Promise<void> {
                 description = excluded.description,
                 sync_status = 'synced',
                 updated_at = excluded.updated_at,
-                deleted_at = NULL
+                deleted_at = NULL,
+                owner_email = excluded.owner_email
         `, [
             localId,
             trip.id,
@@ -350,6 +365,7 @@ export async function upsertTripFromServer(trip: Trip): Promise<void> {
             trip.description ?? null,
             timestamp,
             timestamp,
+            ownerEmail,
         ]);
 
         await replaceTripTravelModes(localId, trip.travelModes ?? [], "synced");

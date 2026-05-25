@@ -12,6 +12,7 @@ import {IndieFlower_400Regular} from "@expo-google-fonts/indie-flower";
 import {GestureHandlerRootView} from "react-native-gesture-handler";
 import {ThemeProvider, useTheme} from "@/context/ThemeContext";
 import {initializeLocalSchema} from "@/local/schema";
+import {AuthProvider} from "@/context/AuthContext";
 
 export default function RootLayout() {
 
@@ -45,11 +46,11 @@ export default function RootLayout() {
             <SafeAreaProvider>
                 <QueryClientProvider client={queryClient}>
                     <ThemeProvider>
-
-                        <Stack screenOptions={{headerShown: false}}/>
-
-                        <ThemedStatusBar/>
-                        <HomeOverlayButton/>
+                        <AuthProvider>
+                            <Stack screenOptions={{headerShown: false}}/>
+                            <ThemedStatusBar/>
+                            <HomeOverlayButton/>
+                        </AuthProvider>
                     </ThemeProvider>
                 </QueryClientProvider>
             </SafeAreaProvider>
@@ -68,7 +69,7 @@ function HomeOverlayButton() {
     const {theme} = useTheme();
     const tokens = theme.tokens;
 
-    if (pathname === "/") return null;
+    if (pathname === "/" || pathname.startsWith("/auth")) return null;
 
     return (
         <View

@@ -1,4 +1,5 @@
 import {getDB} from "./db";
+import {requireCurrentOwnerEmail} from "@/local/account";
 
 export type SyncEntityType = "trip" | "stop" | "entry" | "photo";
 export type SyncOperation = "create" | "update" | "delete" | "updateCaption";
@@ -30,6 +31,7 @@ export async function enqueueSyncOperation(
     payload: unknown
 ): Promise<void> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
     const timestamp = nowIso();
     const serializedPayload = JSON.stringify(payload);
     const existing = await db.getFirstAsync<{id: string}>(`
@@ -38,9 +40,10 @@ export async function enqueueSyncOperation(
         WHERE entity_type = ?
           AND entity_local_id = ?
           AND operation = ?
+          AND owner_email = ?
           AND status IN ('pending', 'error', 'processing')
         LIMIT 1
-    `, [entityType, entityLocalId, operation]);
+    `, [entityType, entityLocalId, operation, ownerEmail]);
 
     if (existing) {
         await db.runAsync(`
@@ -57,9 +60,9 @@ export async function enqueueSyncOperation(
     await db.runAsync(`
         INSERT INTO sync_queue (
             id, entity_type, entity_local_id, operation, payload,
-            status, attempts, last_error, created_at, updated_at
+            status, attempts, last_error, created_at, updated_at, owner_email
         )
-        VALUES (?, ?, ?, ?, ?, 'pending', 0, NULL, ?, ?)
+        VALUES (?, ?, ?, ?, ?, 'pending', 0, NULL, ?, ?, ?)
     `, [
         createQueueId(),
         entityType,
@@ -68,19 +71,22 @@ export async function enqueueSyncOperation(
         serializedPayload,
         timestamp,
         timestamp,
+        ownerEmail,
     ]);
 }
 
 export async function getPendingSyncQueue(limit = 25): Promise<SyncQueueItem[]> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
 
     return db.getAllAsync<SyncQueueItem>(`
         SELECT id, entity_type, entity_local_id, operation, payload, status, attempts, last_error
         FROM sync_queue
-        WHERE status IN ('pending', 'error')
+        WHERE owner_email = ?
+          AND status IN ('pending', 'error')
         ORDER BY created_at ASC
         LIMIT ?
-    `, [limit]);
+    `, [ownerEmail, limit]);
 }
 
 export async function markSyncQueueItemProcessing(id: string): Promise<void> {

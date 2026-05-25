@@ -1,7 +1,9 @@
 import {api_url} from "@/api/config";
+import {getStoredAuthSession, refreshStoredAuthSession} from "@/auth/auth-storage";
 
 type ApiFetchOptions = RequestInit & {
     timeoutMs?: number;
+    skipAuthRefresh?: boolean;
 };
 
 export class ApiError extends Error {
@@ -24,15 +26,35 @@ function buildUrl(path: string): string {
 }
 
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
-    const {timeoutMs = 4000, ...requestOptions} = options;
+    const {timeoutMs = 4000, skipAuthRefresh = false, ...requestOptions} = options;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const session = await getStoredAuthSession();
+    const headers = new Headers(requestOptions.headers);
+
+    if (session?.token && !headers.has("Authorization")) {
+        headers.set("Authorization", `Bearer ${session.token}`);
+    }
 
     try {
-        const response = await fetch(buildUrl(path), {
+        let response = await fetch(buildUrl(path), {
             ...requestOptions,
+            headers,
             signal: controller.signal,
         });
+
+        if (response.status === 401 && !skipAuthRefresh) {
+            const refreshed = await refreshStoredAuthSession();
+
+            if (refreshed?.token) {
+                headers.set("Authorization", `Bearer ${refreshed.token}`);
+                response = await fetch(buildUrl(path), {
+                    ...requestOptions,
+                    headers,
+                    signal: controller.signal,
+                });
+            }
+        }
 
         const text = await response.text();
 

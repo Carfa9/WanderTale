@@ -29,6 +29,31 @@ public sealed class OwnershipEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task TripEndpoints_WhenTripBelongsToAnotherUser_ReturnNotFound()
+    {
+        var tripId = await CreateTrip(_clientA);
+        var updateRequest = new UpdateTripRequest(
+            "Osaka",
+            "Japan",
+            "Updated trip",
+            new DateTime(2026, 4, 3),
+            new DateTime(2026, 4, 12),
+            ["Train"]
+        );
+
+        var listResponse = await _clientB.GetFromJsonAsync<List<TripResponse>>("/trips");
+        var getResponse = await _clientB.GetAsync($"/trips/{tripId}");
+        var updateResponse = await _clientB.PutAsJsonAsync($"/trips/{tripId}", updateRequest);
+        var deleteResponse = await _clientB.DeleteAsync($"/trips/{tripId}");
+
+        Assert.NotNull(listResponse);
+        Assert.DoesNotContain(listResponse, trip => trip.Id == tripId);
+        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, updateResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task StopEndpoints_WhenTripBelongsToAnotherUser_ReturnNotFound()
     {
         var tripId = await CreateTrip(_clientA);

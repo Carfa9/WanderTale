@@ -24,6 +24,7 @@ var jwtSigningKey = builder.Configuration["Jwt:SigningKey"]
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
+    {
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -36,7 +37,26 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(jwtSigningKey))
-        });
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+
+                if (!string.IsNullOrWhiteSpace(accessToken) &&
+                    path.StartsWithSegments("/photos") &&
+                    path.Value?.EndsWith("/image", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
+    });
 
 builder.Services.AddAuthorization();
 
@@ -95,8 +115,6 @@ app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseStaticFiles();
-
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -142,8 +160,18 @@ static void EnsureLegacySyncSchema(AppDbContext db)
         );
         """);
 
-    db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Trips_ClientId" ON "Trips" ("ClientId");""");
-    db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Stops_ClientId" ON "Stops" ("ClientId");""");
+    db.Database.ExecuteSqlRaw("""DROP INDEX IF EXISTS "IX_Trips_ClientId";""");
+    db.Database.ExecuteSqlRaw("""DROP INDEX IF EXISTS "IX_Stops_ClientId";""");
+
+    db.Database.ExecuteSqlRaw("""
+        UPDATE Trips
+        SET UserId = (SELECT Id FROM Users LIMIT 1)
+        WHERE UserId = '0'
+          AND (SELECT COUNT(*) FROM Users) = 1;
+        """);
+
+    db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Trips_UserId_ClientId" ON "Trips" ("UserId", "ClientId");""");
+    db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Stops_TripId_ClientId" ON "Stops" ("TripId", "ClientId");""");
     db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_TripTravelModes_TripId_Mode" ON "TripTravelModes" ("TripId", "Mode");""");
     db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_StopTravelModes_StopId_Mode" ON "StopTravelModes" ("StopId", "Mode");""");
 }

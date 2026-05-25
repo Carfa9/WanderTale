@@ -11,7 +11,7 @@ public static class TripEndpoints
     {
         app.MapGet("/trips", async (AppDbContext db, ClaimsPrincipal user) =>
         {
-            var userId = GetUserId(user);
+            var userId = EndpointAuth.GetUserId(user);
 
             if (userId is null)
             {
@@ -41,7 +41,7 @@ public static class TripEndpoints
         
         app.MapGet("/trips/{id:guid}", async (AppDbContext db, Guid id, ClaimsPrincipal user ) =>
         {
-            var userId = GetUserId(user);
+            var userId = EndpointAuth.GetUserId(user);
 
             if (userId is null)
             {
@@ -71,7 +71,7 @@ public static class TripEndpoints
         
         app.MapPost("/trips", async (AppDbContext db, CreateTripRequest request, ClaimsPrincipal user) =>
         {
-            var userId = GetUserId(user);
+            var userId = EndpointAuth.GetUserId(user);
 
             if (userId is null)
             {
@@ -156,7 +156,7 @@ public static class TripEndpoints
         
         app.MapPut("/trips/{id:guid}", async (AppDbContext db, Guid id, UpdateTripRequest request, ClaimsPrincipal user) =>
         {
-            var userId = GetUserId(user);
+            var userId = EndpointAuth.GetUserId(user);
 
             if (userId is null)
             {
@@ -209,7 +209,7 @@ public static class TripEndpoints
 
         app.MapDelete("/trips/{id:guid}", async (AppDbContext db, Guid id, IWebHostEnvironment env, ClaimsPrincipal user) =>
         {
-            var userId = GetUserId(user);
+            var userId = EndpointAuth.GetUserId(user);
 
             if (userId is null)
             {
@@ -222,13 +222,9 @@ public static class TripEndpoints
 
             if (trip is null) return Results.NotFound();
 
-            var root = string.IsNullOrWhiteSpace(env.WebRootPath)
-                ? Path.Combine(env.ContentRootPath, "wwwroot")
-                : env.WebRootPath;
-
             foreach (var photo in trip.Photos)
             {
-                var filePath = Path.Combine(root, photo.ImageUri.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                var filePath = PhotosEndpoints.ResolveStoredPhotoPath(env, photo.ImageUri);
                 if (File.Exists(filePath)) File.Delete(filePath);
             }
 
@@ -236,10 +232,5 @@ public static class TripEndpoints
             await db.SaveChangesAsync();
             return Results.NoContent();
         }).RequireAuthorization();
-    }
-    private static Guid? GetUserId(ClaimsPrincipal user)
-    {
-        var value = user.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(value, out var userId) ? userId : null;
     }
 }

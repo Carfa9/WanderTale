@@ -52,6 +52,10 @@ function isNotFound(error: unknown): boolean {
     return error instanceof ApiError && error.status === 404;
 }
 
+function isUnauthorized(error: unknown): boolean {
+    return error instanceof ApiError && error.status === 401;
+}
+
 async function syncTripCreate(item: SyncQueueItem): Promise<void> {
     const localTrip = await getLocalTripById(item.entity_local_id);
 
@@ -441,6 +445,9 @@ export async function processPendingSyncQueue(): Promise<void> {
                 throw new Error(`Unsupported sync operation: ${item.entity_type}/${item.operation}`);
             } catch (error) {
                 await markSyncQueueItemError(item.id, error);
+                if (isUnauthorized(error)) {
+                    break;
+                }
             }
         }
     } finally {

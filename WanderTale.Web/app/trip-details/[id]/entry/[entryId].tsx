@@ -7,10 +7,11 @@ import {Image} from "expo-image";
 import Carousel from "react-native-reanimated-carousel";
 import {AppText} from "@/components/app-text";
 import {getEntries} from "@/api/entries";
-import {getPhotos, resolvePhotoImageUri} from "@/api/photo";
+import {getPhotos, resolvePhotoImageSource} from "@/api/photo";
 import {FormatDate} from "@/components/format-date";
 import {Photo} from "@/types/photo";
 import {useTheme} from "@/context/ThemeContext";
+import {useAuth} from "@/context/AuthContext";
 
 const {width: screenWidth} = Dimensions.get("window");
 const PHOTO_WIDTH = Math.min(screenWidth * 0.58, 220);
@@ -21,6 +22,7 @@ const CARD_HEIGHT = PHOTO_HEIGHT + POLAROID_PAD + POLAROID_BOTTOM;
 
 export default function EntryDetailScreen() {
     const {theme} = useTheme();
+    const {session} = useAuth();
     const styles = createStyles(theme.tokens);
     const {id, entryId} = useLocalSearchParams<{ id: string; entryId: string }>();
     const tripId = String(id);
@@ -88,7 +90,7 @@ export default function EntryDetailScreen() {
                                     <View style={styles.slide}>
                                         <View style={styles.polaroid}>
                                             <Image
-                                                source={resolvePhotoImageUri(item.imageUri)}
+                                                source={resolvePhotoImageSource(item.imageUri, session?.token, item.id)}
                                                 style={styles.photo}
                                                 contentFit="cover"
                                             />

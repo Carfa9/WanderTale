@@ -2,6 +2,7 @@ import {CreateStopDto, Stop} from "@/types/stop";
 import {TravelModeKey} from "@/types/travelMode";
 import {getDB} from "./db";
 import {getTripLocalId} from "./trips-repo";
+import {requireCurrentOwnerEmail} from "@/local/account";
 
 type SyncStatus = "synced" | "pending" | "error";
 
@@ -63,6 +64,7 @@ async function getNextOrderIndex(tripLocalId: string): Promise<number> {
 
 export async function getLocalStopsByTripId(tripId: string): Promise<Stop[]> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
     const rows = await db.getAllAsync<StopRow>(`
         SELECT
             s.local_id,
@@ -80,9 +82,10 @@ export async function getLocalStopsByTripId(tripId: string): Promise<Stop[]> {
         FROM stops s
         INNER JOIN trips t ON t.local_id = s.trip_local_id
         WHERE s.deleted_at IS NULL
+          AND t.owner_email = ?
           AND (s.trip_local_id = ? OR t.server_id = ?)
         ORDER BY s.order_index ASC, s.created_at ASC
-    `, [tripId, tripId]);
+    `, [ownerEmail, tripId, tripId]);
 
     return Promise.all(
         rows.map(async row =>
@@ -93,6 +96,7 @@ export async function getLocalStopsByTripId(tripId: string): Promise<Stop[]> {
 
 export async function getLocalStopForSync(localId: string): Promise<{stop: Stop; tripLocalId: string} | null> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
     const row = await db.getFirstAsync<StopRow>(`
         SELECT
             s.local_id,
@@ -110,9 +114,10 @@ export async function getLocalStopForSync(localId: string): Promise<{stop: Stop;
         FROM stops s
         INNER JOIN trips t ON t.local_id = s.trip_local_id
         WHERE s.local_id = ?
+          AND t.owner_email = ?
           AND s.deleted_at IS NULL
         LIMIT 1
-    `, [localId]);
+    `, [localId, ownerEmail]);
 
     if (!row) return null;
 

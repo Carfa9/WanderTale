@@ -13,10 +13,11 @@ import {useQuery, useQueryClient} from "@tanstack/react-query";
 import {Image} from "expo-image";
 import {AppText} from "@/components/app-text";
 import {getTripById} from "@/api/trips";
-import {deletePhoto, getPhotos, resolvePhotoImageUri} from "@/api/photo";
+import {deletePhoto, getPhotos, resolvePhotoImageSource} from "@/api/photo";
 import {Photo} from "@/types/photo";
 import {useTheme} from "@/context/ThemeContext";
 import PhotoDetailModal from "@/components/photo-detail-modal";
+import {useAuth} from "@/context/AuthContext";
 
 const {width: screenWidth} = Dimensions.get("window");
 
@@ -30,6 +31,7 @@ const CELL_HEIGHT = CELL_SIZE + THUMB_PAD + THUMB_BOTTOM;
 
 export default function AlbumScreen() {
     const {theme} = useTheme();
+    const {session} = useAuth();
     const styles = createStyles(theme.tokens);
     const {id, initialIndex} = useLocalSearchParams<{ id: string; initialIndex?: string }>();
     const tripId = String(id);
@@ -136,7 +138,7 @@ export default function AlbumScreen() {
                         <Pressable style={styles.cell} onPress={() => openOverlay(index)}>
                             <View style={styles.thumbPolaroid}>
                                 <Image
-                                    source={resolvePhotoImageUri(photo.imageUri)}
+                                    source={resolvePhotoImageSource(photo.imageUri, session?.token, photo.id)}
                                     style={styles.thumbPhoto}
                                     contentFit="cover"
                                 />

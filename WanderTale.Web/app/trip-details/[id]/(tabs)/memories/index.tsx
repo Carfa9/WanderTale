@@ -6,7 +6,7 @@ import {getTripById} from "@/api/trips";
 import {SafeAreaView} from "react-native-safe-area-context";
 import {AppText} from "@/components/app-text";
 import MemoryCarousel from "@/components/image-carousel";
-import {getPhotos, resolvePhotoImageUri} from "@/api/photo";
+import {getPhotos, resolvePhotoImageSource} from "@/api/photo";
 import {getEntries} from "@/api/entries";
 import {getStopsByTripId} from "@/api/stops";
 import {Entry} from "@/types/entry";
@@ -15,11 +15,13 @@ import {useTheme} from "@/context/ThemeContext";
 import {useState} from "react";
 import {Ionicons} from "@expo/vector-icons";
 import PhotoDetailModal from "@/components/photo-detail-modal";
+import {useAuth} from "@/context/AuthContext";
 
 export default function MemoriesScreen() {
     const [notesOpen, setNotesOpen] = useState(false);
     const [photoModalIndex, setPhotoModalIndex] = useState<number | null>(null);
     const {theme} = useTheme();
+    const {session} = useAuth();
     const styles = createStyles(theme.tokens);
     const {id} = useLocalSearchParams<{ id: string | string[] }>();
     const tripId = Array.isArray(id) ? id[0] : id;
@@ -48,7 +50,7 @@ export default function MemoriesScreen() {
         enabled: !!tripId,
     });
 
-    const images = photos.map((photo) => resolvePhotoImageUri(photo.imageUri));
+    const images = photos.map((photo) => resolvePhotoImageSource(photo.imageUri, session?.token, photo.id));
     const latestEntry = entries[0];
     const journalPreview =
         latestEntry?.content?.trim() ||

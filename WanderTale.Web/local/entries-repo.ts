@@ -2,6 +2,7 @@ import {CreateEntryDto} from "@/dto/createEntryDto";
 import {Entry} from "@/types/entry";
 import {getDB} from "./db";
 import {getTripLocalId} from "./trips-repo";
+import {requireCurrentOwnerEmail} from "@/local/account";
 
 type EntryRow = {
     local_id: string;
@@ -33,14 +34,16 @@ function entryFromRow(row: EntryRow): Entry {
 
 export async function getLocalEntriesByTripId(tripId: string): Promise<Entry[]> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
     const rows = await db.getAllAsync<EntryRow>(`
         SELECT e.local_id, e.server_id, e.trip_local_id, e.title, e.content, e.entry_date
         FROM entries e
         INNER JOIN trips t ON t.local_id = e.trip_local_id
         WHERE e.deleted_at IS NULL
+          AND t.owner_email = ?
           AND (e.trip_local_id = ? OR t.server_id = ?)
         ORDER BY e.entry_date DESC, e.created_at DESC
-    `, [tripId, tripId]);
+    `, [ownerEmail, tripId, tripId]);
 
     const entries = rows.map(entryFromRow);
     const seen = new Set<string>();
@@ -80,13 +83,16 @@ export async function getEntryServerId(localId: string): Promise<string | null> 
 
 export async function getLocalEntryForSync(localId: string): Promise<{entry: Entry; tripLocalId: string} | null> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
     const row = await db.getFirstAsync<EntryRow>(`
-        SELECT local_id, server_id, trip_local_id, title, content, entry_date
-        FROM entries
-        WHERE local_id = ?
-          AND deleted_at IS NULL
+        SELECT e.local_id, e.server_id, e.trip_local_id, e.title, e.content, e.entry_date
+        FROM entries e
+        INNER JOIN trips t ON t.local_id = e.trip_local_id
+        WHERE e.local_id = ?
+          AND t.owner_email = ?
+          AND e.deleted_at IS NULL
         LIMIT 1
-    `, [localId]);
+    `, [localId, ownerEmail]);
 
     if (!row) return null;
 
