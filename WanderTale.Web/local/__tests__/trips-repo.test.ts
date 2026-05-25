@@ -87,6 +87,7 @@ describe("trips-repo sync behavior", () => {
             2,
             expect.stringContaining("WHERE deleted_at IS NOT NULL"),
             [
+                "__anonymous__",
                 "Tokyo",
                 "Japan",
                 "2026-05-01T00:00:00.000Z",

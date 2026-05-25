@@ -91,6 +91,45 @@ public sealed class TripsEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateTrip_WithSameClientIdForDifferentUsers_CreatesSeparateTrips()
+    {
+        using var clientA = _factory.CreateClient();
+        using var clientB = _factory.CreateClient();
+        clientB.DefaultRequestHeaders.Add(TestAuthHandler.UserIdHeader, "22222222-2222-2222-2222-222222222222");
+
+        var request = new CreateTripRequest(
+            "Tokyo",
+            "Japan",
+            "Spring trip",
+            new DateTime(2026, 4, 1),
+            new DateTime(2026, 4, 14),
+            ["Plane"],
+            "trip_local_same_device_id"
+        );
+
+        var firstResponse = await clientA.PostAsJsonAsync("/trips", request);
+        var secondResponse = await clientB.PostAsJsonAsync("/trips", request);
+
+        firstResponse.EnsureSuccessStatusCode();
+        secondResponse.EnsureSuccessStatusCode();
+
+        var first = await firstResponse.Content.ReadFromJsonAsync<TripResponse>();
+        var second = await secondResponse.Content.ReadFromJsonAsync<TripResponse>();
+        var tripsForA = await clientA.GetFromJsonAsync<List<TripResponse>>("/trips");
+        var tripsForB = await clientB.GetFromJsonAsync<List<TripResponse>>("/trips");
+
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        Assert.NotEqual(first.Id, second.Id);
+        Assert.NotNull(tripsForA);
+        Assert.NotNull(tripsForB);
+        Assert.Single(tripsForA);
+        Assert.Single(tripsForB);
+        Assert.Equal(first.Id, tripsForA[0].Id);
+        Assert.Equal(second.Id, tripsForB[0].Id);
+    }
+
+    [Fact]
     public async Task CreateTrip_WhenTitleIsBlank_ReturnsBadRequest()
     {
         var request = new CreateTripRequest(

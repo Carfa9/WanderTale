@@ -42,7 +42,7 @@ describe("sync-queue", () => {
 
         expect(db.getFirstAsync).toHaveBeenCalledWith(
             expect.stringContaining("status IN ('pending', 'error', 'processing')"),
-            ["trip", "trip_local_1", "create"]
+            ["trip", "trip_local_1", "create", "__anonymous__"]
         );
         expect(db.runAsync).toHaveBeenCalledTimes(1);
         expect(db.runAsync).toHaveBeenCalledWith(
@@ -68,6 +68,7 @@ describe("sync-queue", () => {
                 JSON.stringify({title: "Kyoto"}),
                 "2026-05-21T10:00:00.000Z",
                 "2026-05-21T10:00:00.000Z",
+                "__anonymous__",
             ]
         );
     });
@@ -81,8 +82,8 @@ describe("sync-queue", () => {
 
         expect(result).toEqual([{id: "sync_1"}]);
         expect(db.getAllAsync).toHaveBeenCalledWith(
-            expect.stringContaining("WHERE status IN ('pending', 'error')"),
-            [10]
+            expect.stringContaining("status IN ('pending', 'error')"),
+            ["__anonymous__", 10]
         );
         expect(db.getAllAsync.mock.calls[0][0]).toContain("ORDER BY created_at ASC");
     });
