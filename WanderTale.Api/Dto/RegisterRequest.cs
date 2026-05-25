@@ -1,3 +1,3 @@
 ﻿namespace WanderTale.Dto;
 
-public record RegisterRequest(string Email, string Password);
+public record RegisterRequest(string Name, string Email, string Password);
