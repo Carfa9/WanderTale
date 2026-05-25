@@ -5,6 +5,7 @@ import Carousel from "react-native-reanimated-carousel";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import {useTheme} from "@/context/ThemeContext";
+import {PhotoImageSource} from "@/api/photo";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -16,7 +17,7 @@ const CARD_HEIGHT = PHOTO_HEIGHT + POLAROID_H_PAD + POLAROID_BOTTOM;
 const SIDE_OFFSET = Math.min(screenWidth * 0.27, 112);
 
 type Props = {
-    images: string[];
+    images: PhotoImageSource[];
     tripId: string;
     onPhotoPress?: (index: number) => void;
 };

@@ -16,12 +16,26 @@ import {processPendingSyncQueue} from "@/local/sync-engine";
 import {getTripLocalId, getTripServerId} from "@/local/trips-repo";
 import {Photo} from "@/types/photo";
 
-export function resolvePhotoImageUri(imageUri: string): string {
+export type PhotoImageSource = {
+    uri: string;
+    headers?: Record<string, string>;
+};
+
+export function resolvePhotoImageSource(imageUri: string, token?: string, photoId?: string): PhotoImageSource {
     if (/^(https?:|file:|content:|data:|blob:)/.test(imageUri)) {
-        return imageUri;
+        return {uri: imageUri};
     }
 
-    return `${api_url}${imageUri}`;
+    const path = imageUri.startsWith("/uploads/") && photoId ? `/photos/${photoId}/image` : imageUri;
+    const baseUri = `${api_url}${path.startsWith("/") ? path : `/${path}`}`;
+
+    if (!token) return {uri: baseUri};
+
+    const separator = baseUri.includes("?") ? "&" : "?";
+    return {
+        uri: `${baseUri}${separator}access_token=${encodeURIComponent(token)}`,
+        headers: {Authorization: `Bearer ${token}`},
+    };
 }
 
 async function getServerTripIdForFetch(tripId: string): Promise<string | null> {

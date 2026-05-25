@@ -16,8 +16,9 @@ import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {AppText} from "@/components/app-text";
 import {FormatDate} from "@/components/format-date";
 import {useTheme} from "@/context/ThemeContext";
-import {deletePhoto, resolvePhotoImageUri, updatePhotoCaption} from "@/api/photo";
+import {deletePhoto, resolvePhotoImageSource, updatePhotoCaption} from "@/api/photo";
 import {Photo} from "@/types/photo";
+import {useAuth} from "@/context/AuthContext";
 
 type Props = {
     visible: boolean;
@@ -41,6 +42,7 @@ export default function PhotoDetailModal({
     onIndexChange,
 }: Props) {
     const {theme} = useTheme();
+    const {session} = useAuth();
     const styles = createStyles(theme.tokens);
     const queryClient = useQueryClient();
     const [captions, setCaptions] = useState<Record<string, string>>({});
@@ -172,7 +174,7 @@ export default function PhotoDetailModal({
                                 <>
                                     <View style={styles.overlayPolaroid}>
                                         <Image
-                                            source={{uri: resolvePhotoImageUri(currentPhoto.imageUri)}}
+                                            source={resolvePhotoImageSource(currentPhoto.imageUri, session?.token, currentPhoto.id)}
                                             style={styles.overlayPhoto}
                                             contentFit="cover"
                                         />

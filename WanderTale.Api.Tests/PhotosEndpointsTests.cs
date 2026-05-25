@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using WanderTale.Dto;
 using Xunit;
 
@@ -76,11 +78,19 @@ public sealed class PhotosEndpointsTests : IDisposable
         return content;
     }
 
-    private string GetSavedFilePath(PhotoResponse photo)
+    private async Task<string> GetSavedFilePath(Guid photoId)
     {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+        var photo = await db.Photo.FindAsync(photoId);
+
+        Assert.NotNull(photo);
+
         return Path.Combine(
-            _factory.WebRootPath,
-            photo.ImageUri.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)
+            env.ContentRootPath,
+            "private-uploads",
+            photo.ImageUri.Replace('/', Path.DirectorySeparatorChar)
         );
     }
 
@@ -106,9 +116,12 @@ public sealed class PhotosEndpointsTests : IDisposable
         Assert.Equal("Temple gate", photo.Caption);
         Assert.Equal(new DateTime(2026, 4, 3), photo.PhotoDate);
         Assert.Equal("Kyoto", photo.Location);
-        Assert.StartsWith($"/uploads/trips/{tripId}/", photo.ImageUri);
-        Assert.EndsWith(".jpg", photo.ImageUri);
-        Assert.True(File.Exists(GetSavedFilePath(photo)));
+        Assert.Equal($"/photos/{photo.Id}/image", photo.ImageUri);
+        Assert.True(File.Exists(await GetSavedFilePath(photo.Id)));
+
+        var imageResponse = await _client.GetAsync(photo.ImageUri);
+        Assert.Equal(HttpStatusCode.OK, imageResponse.StatusCode);
+        Assert.Equal("image/jpeg", imageResponse.Content.Headers.ContentType?.MediaType);
     }
 
     [Fact]
@@ -160,7 +173,7 @@ public sealed class PhotosEndpointsTests : IDisposable
     {
         var tripId = await CreateTrip();
         var created = await CreatePhoto(tripId);
-        var filePath = GetSavedFilePath(created);
+        var filePath = await GetSavedFilePath(created.Id);
 
         Assert.True(File.Exists(filePath));
 

@@ -2,6 +2,7 @@ import {Photo} from "@/types/photo";
 import {getDB} from "./db";
 import {getEntryLocalId} from "./entries-repo";
 import {getTripLocalId} from "./trips-repo";
+import {requireCurrentOwnerEmail} from "@/local/account";
 
 type PhotoInput = {
     imageUri: string;
@@ -93,6 +94,7 @@ function photoFromRow(row: PhotoRow): Photo {
 
 export async function getLocalPhotosByTripId(tripId: string): Promise<Photo[]> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
     const rows = await db.getAllAsync<PhotoRow>(`
         SELECT
             p.local_id,
@@ -112,15 +114,17 @@ export async function getLocalPhotosByTripId(tripId: string): Promise<Photo[]> {
         INNER JOIN trips t ON t.local_id = p.trip_local_id
         LEFT JOIN entries e ON e.local_id = p.entry_local_id
         WHERE p.deleted_at IS NULL
+          AND t.owner_email = ?
           AND (p.trip_local_id = ? OR t.server_id = ?)
         ORDER BY p.created_at DESC
-    `, [tripId, tripId]);
+    `, [ownerEmail, tripId, tripId]);
 
     return rows.map(photoFromRow);
 }
 
 export async function getLocalPhotoForSync(localId: string): Promise<{photo: Photo; tripLocalId: string; entryLocalId: string | null} | null> {
     const db = await getDB();
+    const ownerEmail = await requireCurrentOwnerEmail();
     const row = await db.getFirstAsync<PhotoRow>(`
         SELECT
             p.local_id,
@@ -140,9 +144,10 @@ export async function getLocalPhotoForSync(localId: string): Promise<{photo: Pho
         INNER JOIN trips t ON t.local_id = p.trip_local_id
         LEFT JOIN entries e ON e.local_id = p.entry_local_id
         WHERE p.local_id = ?
+          AND t.owner_email = ?
           AND p.deleted_at IS NULL
         LIMIT 1
-    `, [localId]);
+    `, [localId, ownerEmail]);
 
     if (!row) return null;
 

@@ -23,7 +23,7 @@ public static class PhotosEndpoints
                     p.Id,
                     p.TripId,
                     p.EntryId,
-                    p.ImageUri,
+                    ImageUri = ProtectedPhotoUri(p.Id),
                     p.Caption,
                     p.PhotoDate,
                     p.Location,
@@ -33,6 +33,23 @@ public static class PhotosEndpoints
 
             return Results.Ok(photos);
         }).RequireAuthorization();
+
+        app.MapGet("/photos/{photoId:guid}/image",
+            async (AppDbContext db, Guid photoId, IWebHostEnvironment env, ClaimsPrincipal user) =>
+            {
+                var userId = EndpointAuth.GetUserId(user);
+                if (userId is null) return Results.Unauthorized();
+
+                var photo = await db.Photo
+                    .Include(p => p.Trip)
+                    .FirstOrDefaultAsync(p => p.Id == photoId && p.Trip.UserId == userId.Value);
+                if (photo is null) return Results.NotFound();
+
+                var filePath = ResolveStoredPhotoPath(env, photo.ImageUri);
+                if (!File.Exists(filePath)) return Results.NotFound();
+
+                return Results.File(filePath, GetImageContentType(filePath));
+            }).RequireAuthorization();
 
         app.MapDelete("/photos/{photoId:guid}",
             async (AppDbContext db, Guid photoId, IWebHostEnvironment env, ClaimsPrincipal user) =>
@@ -45,10 +62,7 @@ public static class PhotosEndpoints
                     .FirstOrDefaultAsync(p => p.Id == photoId && p.Trip.UserId == userId.Value);
                 if (photo is null) return Results.NotFound();
 
-                var root = string.IsNullOrWhiteSpace(env.WebRootPath)
-                    ? Path.Combine(env.ContentRootPath, "wwwroot")
-                    : env.WebRootPath;
-                var filePath = Path.Combine(root, photo.ImageUri.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                var filePath = ResolveStoredPhotoPath(env, photo.ImageUri);
                 if (File.Exists(filePath)) File.Delete(filePath);
 
                 db.Photo.Remove(photo);
@@ -121,10 +135,7 @@ public static class PhotosEndpoints
                     photoDate = parsedPhotoDate;
                 }
 
-                var root = string.IsNullOrWhiteSpace(env.WebRootPath)
-                    ? Path.Combine(env.ContentRootPath, "wwwroot")
-                    : env.WebRootPath;
-                var uploadsFolder = Path.Combine(root, "uploads", "trips", tripId.ToString());
+                var uploadsFolder = Path.Combine(GetPrivateUploadsRoot(env), "trips", tripId.ToString());
                 Directory.CreateDirectory(uploadsFolder);
 
                 var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
@@ -142,7 +153,7 @@ public static class PhotosEndpoints
                     Id = Guid.NewGuid(),
                     TripId = tripId,
                     EntryId = entryId,
-                    ImageUri = $"/uploads/trips/{tripId}/{fileName}",
+                    ImageUri = $"trips/{tripId}/{fileName}",
                     Caption = string.IsNullOrWhiteSpace(caption) ? null : caption,
                     PhotoDate = photoDate,
                     Location = string.IsNullOrWhiteSpace(location) ? null : location.Trim(),
@@ -153,7 +164,67 @@ public static class PhotosEndpoints
                 db.Photo.Add(photo);
                 await db.SaveChangesAsync();
 
-                return Results.Ok(photo);
+                return Results.Ok(new
+                {
+                    photo.Id,
+                    photo.TripId,
+                    photo.EntryId,
+                    ImageUri = ProtectedPhotoUri(photo.Id),
+                    photo.Caption,
+                    photo.PhotoDate,
+                    photo.Location,
+                    photo.CreatedAt,
+                    photo.UpdatedAt
+                });
             }).RequireAuthorization();
+    }
+
+    private static string ProtectedPhotoUri(Guid photoId) => $"/photos/{photoId}/image";
+
+    internal static string ResolveStoredPhotoPath(IWebHostEnvironment env, string imageUri)
+    {
+        var normalized = imageUri.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+
+        if (imageUri.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
+        {
+            var publicRoot = string.IsNullOrWhiteSpace(env.WebRootPath)
+                ? Path.Combine(env.ContentRootPath, "wwwroot")
+                : env.WebRootPath;
+
+            return CombineInsideRoot(publicRoot, normalized);
+        }
+
+        return CombineInsideRoot(GetPrivateUploadsRoot(env), normalized);
+    }
+
+    private static string GetPrivateUploadsRoot(IWebHostEnvironment env)
+    {
+        return Path.Combine(env.ContentRootPath, "private-uploads");
+    }
+
+    private static string GetImageContentType(string filePath)
+    {
+        return Path.GetExtension(filePath).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            _ => "application/octet-stream"
+        };
+    }
+
+    private static string CombineInsideRoot(string root, string relativePath)
+    {
+        var fullRoot = Path.GetFullPath(root);
+        var fullPath = Path.GetFullPath(Path.Combine(fullRoot, relativePath));
+        var rootWithSeparator = fullRoot.EndsWith(Path.DirectorySeparatorChar)
+            ? fullRoot
+            : fullRoot + Path.DirectorySeparatorChar;
+
+        if (!fullPath.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Invalid photo path.");
+        }
+
+        return fullPath;
     }
 }
