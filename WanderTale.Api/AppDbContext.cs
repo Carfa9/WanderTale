@@ -17,15 +17,16 @@ public class AppDbContext : DbContext
     public DbSet<Stop> Stops => Set<Stop>();
     public DbSet<StopTravelMode> StopTravelModes => Set<StopTravelMode>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Trip>()
-            .HasIndex(t => t.ClientId)
+            .HasIndex(t => new { t.UserId, t.ClientId })
             .IsUnique();
 
         modelBuilder.Entity<Stop>()
-            .HasIndex(s => s.ClientId)
+            .HasIndex(s => new { s.TripId, s.ClientId })
             .IsUnique();
 
         modelBuilder.Entity<TripTravelMode>()
@@ -38,6 +39,10 @@ public class AppDbContext : DbContext
         
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Email)
+            .IsUnique();
+
+        modelBuilder.Entity<RefreshToken>()
+            .HasIndex(t => t.TokenHash)
             .IsUnique();
     }
 }

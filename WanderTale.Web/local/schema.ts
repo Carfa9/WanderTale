@@ -167,8 +167,29 @@ export async function initializeLocalSchema() {
         CREATE UNIQUE INDEX IF NOT EXISTS ux_stop_travel_modes_stop_mode
             ON stop_travel_modes(stop_local_id, mode);
     `);
+
+    await ensureColumn("trips", "owner_email", "TEXT");
+    await ensureColumn("sync_queue", "owner_email", "TEXT");
+
+    await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_trips_owner_email
+            ON trips(owner_email);
+
+        CREATE INDEX IF NOT EXISTS idx_sync_queue_owner_status_created_at
+            ON sync_queue(owner_email, status, created_at);
+    `);
 }
 
 export async function createTripTable() {
     await initializeLocalSchema();
+}
+
+async function ensureColumn(tableName: string, columnName: string, columnDefinition: string) {
+    const db = await getDB();
+    const rows = await db.getAllAsync<{name: string}>(`PRAGMA table_info(${tableName})`);
+    const exists = rows.some((row) => row.name === columnName);
+
+    if (!exists) {
+        await db.execAsync(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`);
+    }
 }

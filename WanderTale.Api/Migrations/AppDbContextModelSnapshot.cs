@@ -88,6 +88,38 @@ namespace WanderTale.Migrations
                     b.ToTable("Photo");
                 });
 
+            modelBuilder.Entity("WanderTale.Models.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RefreshTokens");
+                });
+
             modelBuilder.Entity("WanderTale.Models.Stop", b =>
                 {
                     b.Property<Guid>("Id")
@@ -127,10 +159,8 @@ namespace WanderTale.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClientId")
+                    b.HasIndex("TripId", "ClientId")
                         .IsUnique();
-
-                    b.HasIndex("TripId");
 
                     b.ToTable("Stops");
                 });
@@ -192,7 +222,7 @@ namespace WanderTale.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClientId")
+                    b.HasIndex("UserId", "ClientId")
                         .IsUnique();
 
                     b.ToTable("Trips");
@@ -232,6 +262,10 @@ namespace WanderTale.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -264,6 +298,17 @@ namespace WanderTale.Migrations
                         .IsRequired();
 
                     b.Navigation("Trip");
+                });
+
+            modelBuilder.Entity("WanderTale.Models.RefreshToken", b =>
+                {
+                    b.HasOne("WanderTale.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("WanderTale.Models.Stop", b =>
