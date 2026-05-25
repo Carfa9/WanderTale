@@ -37,6 +37,7 @@ obj/
 *.db
 *.db-shm
 *.db-wal
+*.db.bak*
 
 ########################################
 #   REACT NATIVE / EXPO
