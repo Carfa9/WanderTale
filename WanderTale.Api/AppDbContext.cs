@@ -7,9 +7,8 @@ public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
-        
     }
-    
+
     public DbSet<Trip> Trips => Set<Trip>();
     public DbSet<TripTravelMode> TripTravelModes => Set<TripTravelMode>();
     public DbSet<Entry> Entries => Set<Entry>();
@@ -36,7 +35,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<StopTravelMode>()
             .HasIndex(sm => new { sm.StopId, sm.Mode })
             .IsUnique();
-        
+
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Email)
             .IsUnique();
@@ -44,5 +43,14 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<RefreshToken>()
             .HasIndex(t => t.TokenHash)
             .IsUnique();
+
+        modelBuilder.Entity<Photo>()
+            .HasIndex(p => new { p.TripId , p.ClientId })
+            .IsUnique();
+
+        modelBuilder.Entity<Entry>()
+            .HasIndex(e => new { e.TripId, e.ClientId })
+            .IsUnique();
     }
+
 }

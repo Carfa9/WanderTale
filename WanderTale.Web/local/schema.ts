@@ -38,6 +38,7 @@ export async function initializeLocalSchema() {
             local_id TEXT PRIMARY KEY NOT NULL,
             server_id TEXT UNIQUE,
             trip_local_id TEXT NOT NULL,
+            client_id TEXT UNIQUE,
             title TEXT,
             content TEXT,
             entry_date TEXT,
@@ -88,6 +89,7 @@ export async function initializeLocalSchema() {
         CREATE TABLE IF NOT EXISTS photos (
             local_id TEXT PRIMARY KEY NOT NULL,
             server_id TEXT UNIQUE,
+            client_id TEXT UNIQUE,
             trip_local_id TEXT NOT NULL,
             entry_local_id TEXT,
             image_uri TEXT NOT NULL,
@@ -119,7 +121,9 @@ export async function initializeLocalSchema() {
             attempts INTEGER NOT NULL DEFAULT 0,
             last_error TEXT,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            next_attempt_at TEXT,
+            locked_at TEXT,
         );
 
         CREATE INDEX IF NOT EXISTS idx_sync_queue_status_created_at
@@ -170,13 +174,17 @@ export async function initializeLocalSchema() {
 
     await ensureColumn("trips", "owner_email", "TEXT");
     await ensureColumn("sync_queue", "owner_email", "TEXT");
+    await ensureColumn("sync_queue", "next_attempt_at", "TEXT");
+    await ensureColumn("sync_queue", "locked_at", "TEXT");
+    await ensureColumn("entries", "client_id", "TEXT");
+    await ensureColumn("photos", "client_id", "TEXT");
 
     await db.execAsync(`
         CREATE INDEX IF NOT EXISTS idx_trips_owner_email
             ON trips(owner_email);
 
         CREATE INDEX IF NOT EXISTS idx_sync_queue_owner_status_created_at
-            ON sync_queue(owner_email, status, created_at);
+            ON sync_queue(owner_email, status, created_at, next_attempt_at, locked_at);
     `);
 }
 
