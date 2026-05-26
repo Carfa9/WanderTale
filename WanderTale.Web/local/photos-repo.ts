@@ -19,6 +19,7 @@ type PhotoRow = {
     trip_server_id: string | null;
     entry_local_id: string | null;
     entry_server_id: string | null;
+    client_id: string | null;
     image_uri: string;
     server_image_uri: string | null;
     caption: string | null;
@@ -83,6 +84,7 @@ function photoFromRow(row: PhotoRow): Photo {
         id: row.server_id ?? row.local_id,
         tripId: row.trip_server_id ?? row.trip_local_id,
         entryId: row.entry_server_id ?? row.entry_local_id,
+        clientId: row.client_id,
         imageUri: isLocalImageUri(row.image_uri) ? row.image_uri : row.server_image_uri ?? row.image_uri,
         caption: row.caption,
         photoDate: row.photo_date,
@@ -103,6 +105,7 @@ export async function getLocalPhotosByTripId(tripId: string): Promise<Photo[]> {
             t.server_id AS trip_server_id,
             p.entry_local_id,
             e.server_id AS entry_server_id,
+            p.client_id,
             p.image_uri,
             p.server_image_uri,
             p.caption,
@@ -133,6 +136,7 @@ export async function getLocalPhotoForSync(localId: string): Promise<{photo: Pho
             t.server_id AS trip_server_id,
             p.entry_local_id,
             e.server_id AS entry_server_id,
+            p.client_id,
             p.image_uri,
             p.server_image_uri,
             p.caption,
@@ -196,12 +200,13 @@ export async function insertLocalPhoto(tripId: string, input: PhotoInput): Promi
 
     await db.runAsync(`
         INSERT INTO photos (
-            local_id, server_id, trip_local_id, entry_local_id, image_uri,
+            local_id, server_id, client_id, trip_local_id, entry_local_id, image_uri,
             server_image_uri, caption, photo_date, location, sync_status,
             created_at, updated_at, deleted_at
         )
-        VALUES (?, NULL, ?, ?, ?, NULL, ?, ?, ?, 'pending', ?, ?, NULL)
+        VALUES (?, NULL, ?, ?, ?, ?, NULL, ?, ?, ?, 'pending', ?, ?, NULL)
     `, [
+        localId,
         localId,
         tripLocalId,
         entryLocalId,
@@ -217,6 +222,7 @@ export async function insertLocalPhoto(tripId: string, input: PhotoInput): Promi
         id: localId,
         tripId,
         entryId: input.entryId,
+        clientId: localId,
         imageUri: input.imageUri,
         caption: input.caption,
         photoDate: input.photoDate,
@@ -287,9 +293,9 @@ export async function upsertPhotoFromServer(tripId: string, photo: Photo): Promi
     }>(`
         SELECT local_id, server_id, sync_status, deleted_at
         FROM photos
-        WHERE server_id = ? OR local_id = ?
+        WHERE server_id = ? OR local_id = ? OR local_id = ?
         LIMIT 1
-    `, [photo.id, photo.id]);
+    `, [photo.id, photo.id, photo.clientId ?? ""]);
 
     if (existing?.deleted_at) {
         return;
@@ -310,15 +316,16 @@ export async function upsertPhotoFromServer(tripId: string, photo: Photo): Promi
 
     await db.runAsync(`
         INSERT INTO photos (
-            local_id, server_id, trip_local_id, entry_local_id, image_uri,
+            local_id, server_id, trip_local_id, entry_local_id, client_id, image_uri,
             server_image_uri, caption, photo_date, location, sync_status,
             created_at, updated_at, deleted_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, NULL)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, NULL)
         ON CONFLICT(local_id) DO UPDATE SET
             server_id = excluded.server_id,
             trip_local_id = excluded.trip_local_id,
             entry_local_id = excluded.entry_local_id,
+            client_id = excluded.client_id,
             server_image_uri = excluded.server_image_uri,
             caption = excluded.caption,
             photo_date = excluded.photo_date,
@@ -331,6 +338,7 @@ export async function upsertPhotoFromServer(tripId: string, photo: Photo): Promi
         photo.id,
         tripLocalId,
         entryLocalId,
+        photo.clientId ?? null,
         photo.imageUri,
         photo.imageUri,
         photo.caption ?? null,

@@ -2,6 +2,7 @@ export type Photo = {
     tripId: string;
     id: string;
     entryId: string | null;
+    clientId?: string | null;
     imageUri: string;
     caption?: string | null;
     photoDate?: string | null;

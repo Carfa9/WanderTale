@@ -23,6 +23,7 @@ public static class PhotosEndpoints
                     p.Id,
                     p.TripId,
                     p.EntryId,
+                    p.ClientId,
                     ImageUri = ProtectedPhotoUri(p.Id),
                     p.Caption,
                     p.PhotoDate,
@@ -101,6 +102,32 @@ public static class PhotosEndpoints
                 var photoDateValue = form["photoDate"].ToString();
                 var location = form["location"].ToString();
                 var entryIdValue = form["entryId"].ToString();
+                var clientId = form["clientId"].ToString();
+                
+                if (!string.IsNullOrWhiteSpace(clientId))
+                {
+                    var existingPhoto = await db.Photo
+                        .FirstOrDefaultAsync(p =>
+                            p.TripId == tripId &&
+                            p.ClientId == clientId);
+
+                    if (existingPhoto is not null)
+                    {
+                        return Results.Ok(new
+                        {
+                            existingPhoto.Id,
+                            existingPhoto.ClientId,
+                            existingPhoto.TripId,
+                            existingPhoto.EntryId,
+                            ImageUri = ProtectedPhotoUri(existingPhoto.Id),
+                            existingPhoto.Caption,
+                            existingPhoto.PhotoDate,
+                            existingPhoto.Location,
+                            existingPhoto.CreatedAt,
+                            existingPhoto.UpdatedAt
+                        });
+                    }
+                }
 
                 if (file is null || file.Length == 0)
                     return Results.BadRequest("Ingen bild skickades");
@@ -153,6 +180,7 @@ public static class PhotosEndpoints
                     Id = Guid.NewGuid(),
                     TripId = tripId,
                     EntryId = entryId,
+                    ClientId = string.IsNullOrWhiteSpace(clientId) ? null : clientId,
                     ImageUri = $"trips/{tripId}/{fileName}",
                     Caption = string.IsNullOrWhiteSpace(caption) ? null : caption,
                     PhotoDate = photoDate,
@@ -169,6 +197,7 @@ public static class PhotosEndpoints
                     photo.Id,
                     photo.TripId,
                     photo.EntryId,
+                    photo.ClientId,
                     ImageUri = ProtectedPhotoUri(photo.Id),
                     photo.Caption,
                     photo.PhotoDate,
