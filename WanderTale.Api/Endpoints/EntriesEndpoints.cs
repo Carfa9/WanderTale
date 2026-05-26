@@ -18,7 +18,7 @@ public static class EntriesEndpoints
             var entries = await db.Entries
                 .Where(e => e.TripId == tripId)
                 .OrderByDescending(e => e.EntryDate)
-                .Select(e => new { e.Id, e.Title, e.EntryDate, e.Content })
+                .Select(e => new { e.Id, e.ClientId, e.Title, e.EntryDate, e.Content })
                 .ToListAsync();
 
             return Results.Ok(entries);
@@ -36,13 +36,35 @@ public static class EntriesEndpoints
 
                 if (EndpointValidation.ValidateRequiredText(req.Content, "content", "Content is required.") is { } contentError)
                     return contentError;
+                
+                if (!string.IsNullOrWhiteSpace(req.ClientId))
+                {
+                    var existingEntry = await db.Entries
+                        .FirstOrDefaultAsync(e =>
+                            e.TripId == tripId &&
+                            e.ClientId == req.ClientId);
 
+                    if (existingEntry is not null)
+                    {
+                        return Results.Ok(new
+                        {
+                            existingEntry.Id,
+                            existingEntry.ClientId,
+                            existingEntry.EntryDate,
+                            existingEntry.Title,
+                            existingEntry.Content,
+                            existingEntry.CreatedAt,
+                            existingEntry.UpdatedAt
+                        });
+                    }
+                }
                 var now = DateTime.UtcNow;
 
                 var entry = new Entry
                 {
                     Id = Guid.NewGuid(),
                     TripId = tripId,
+                    ClientId = string.IsNullOrWhiteSpace(req.ClientId) ? null : req.ClientId,
                     EntryDate = req.EntryDate,
                     Title = req.Title.Trim(),
                     Content = req.Content.Trim(),

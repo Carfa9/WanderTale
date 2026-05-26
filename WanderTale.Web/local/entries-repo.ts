@@ -8,6 +8,7 @@ type EntryRow = {
     local_id: string;
     server_id: string | null;
     trip_local_id: string;
+    client_id: string | null;
     title: string | null;
     content: string | null;
     entry_date: string | null;
@@ -27,6 +28,7 @@ function entryFromRow(row: EntryRow): Entry {
     return {
         id: row.server_id ?? row.local_id,
         entryDate: row.entry_date,
+        clientId: row.client_id ?? row.local_id,
         title: row.title,
         content: row.content,
     };
@@ -36,7 +38,7 @@ export async function getLocalEntriesByTripId(tripId: string): Promise<Entry[]> 
     const db = await getDB();
     const ownerEmail = await requireCurrentOwnerEmail();
     const rows = await db.getAllAsync<EntryRow>(`
-        SELECT e.local_id, e.server_id, e.trip_local_id, e.title, e.content, e.entry_date
+        SELECT e.local_id, e.server_id, e.trip_local_id, e.client_id, e.title, e.content, e.entry_date
         FROM entries e
         INNER JOIN trips t ON t.local_id = e.trip_local_id
         WHERE e.deleted_at IS NULL
@@ -85,7 +87,7 @@ export async function getLocalEntryForSync(localId: string): Promise<{entry: Ent
     const db = await getDB();
     const ownerEmail = await requireCurrentOwnerEmail();
     const row = await db.getFirstAsync<EntryRow>(`
-        SELECT e.local_id, e.server_id, e.trip_local_id, e.title, e.content, e.entry_date
+        SELECT e.local_id, e.server_id, e.client_id, e.trip_local_id, e.title, e.content, e.entry_date
         FROM entries e
         INNER JOIN trips t ON t.local_id = e.trip_local_id
         WHERE e.local_id = ?
@@ -115,11 +117,12 @@ export async function insertLocalEntry(tripId: string, dto: CreateEntryDto): Pro
 
     await db.runAsync(`
         INSERT INTO entries (
-            local_id, server_id, trip_local_id, title, content, entry_date,
+            local_id, server_id, client_id, trip_local_id, title, content, entry_date,
             sync_status, created_at, updated_at, deleted_at
         )
-        VALUES (?, NULL, ?, ?, ?, ?, 'pending', ?, ?, NULL)
+        VALUES (?, NULL, ?, ?, ?, ?, ?, 'pending', ?, ?, NULL)
     `, [
+        localId,
         localId,
         tripLocalId,
         dto.Title ?? null,
@@ -131,6 +134,7 @@ export async function insertLocalEntry(tripId: string, dto: CreateEntryDto): Pro
 
     return {
         id: localId,
+        clientId: localId,
         entryDate: dto.EntryDate ?? null,
         title: dto.Title ?? null,
         content: dto.Content ?? null,
@@ -244,9 +248,9 @@ export async function upsertEntryFromServer(tripId: string, entry: Entry): Promi
     }>(`
         SELECT local_id, server_id, sync_status, deleted_at
         FROM entries
-        WHERE server_id = ? OR local_id = ?
+        WHERE server_id = ? OR local_id = ? OR local_id = ?
         LIMIT 1
-    `, [entry.id, entry.id]);
+    `, [entry.id, entry.id, entry.clientId ?? ""]);
 
     if (existing?.deleted_at) {
         return;
@@ -267,13 +271,14 @@ export async function upsertEntryFromServer(tripId: string, entry: Entry): Promi
 
     await db.runAsync(`
         INSERT INTO entries (
-            local_id, server_id, trip_local_id, title, content, entry_date,
+            local_id, server_id, trip_local_id, client_id, title, content, entry_date,
             sync_status, created_at, updated_at, deleted_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, 'synced', ?, ?, NULL)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, NULL)
         ON CONFLICT(local_id) DO UPDATE SET
             server_id = excluded.server_id,
             trip_local_id = excluded.trip_local_id,
+            client_id = excluded.client_id,
             title = excluded.title,
             content = excluded.content,
             entry_date = excluded.entry_date,
@@ -284,6 +289,7 @@ export async function upsertEntryFromServer(tripId: string, entry: Entry): Promi
         localId,
         entry.id,
         tripLocalId,
+        entry.clientId ?? localId,
         entry.title ?? null,
         entry.content ?? null,
         entry.entryDate ?? null,

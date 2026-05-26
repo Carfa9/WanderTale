@@ -58,7 +58,7 @@ export async function getEntries(tripId: string): Promise<Entry[]> {
 
 export async function createEntry(tripId: string, dto: CreateEntryDto): Promise<Entry> {
     const localEntry = await insertLocalEntry(tripId, dto);
-    await enqueueSyncOperation("entry", localEntry.id, "create", dto);
+    await enqueueSyncOperation("entry", localEntry.id, "create", { ...dto, clientId: localEntry.id });
 
     processPendingSyncQueue().catch(() => {});
 
