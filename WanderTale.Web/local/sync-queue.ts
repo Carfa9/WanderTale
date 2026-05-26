@@ -3,7 +3,7 @@ import {requireCurrentOwnerEmail} from "@/local/account";
 
 export type SyncEntityType = "trip" | "stop" | "entry" | "photo";
 export type SyncOperation = "create" | "update" | "delete" | "updateCaption";
-export type SyncQueueStatus = "pending" | "processing" | "synced" | "error";
+export type SyncQueueStatus = "pending" | "processing" | "synced" | "error" | "failed";
 
 export type SyncQueueItem = {
     id: string;
@@ -34,7 +34,7 @@ export async function enqueueSyncOperation(
     const ownerEmail = await requireCurrentOwnerEmail();
     const timestamp = nowIso();
     const serializedPayload = JSON.stringify(payload);
-    const existing = await db.getFirstAsync<{id: string}>(`
+    const existing = await db.getFirstAsync<{ id: string }>(`
         SELECT id
         FROM sync_queue
         WHERE entity_type = ?
@@ -48,8 +48,8 @@ export async function enqueueSyncOperation(
     if (existing) {
         await db.runAsync(`
             UPDATE sync_queue
-            SET payload = ?,
-                status = 'pending',
+            SET payload    = ?,
+                status     = 'pending',
                 last_error = NULL,
                 updated_at = ?
             WHERE id = ?
@@ -58,10 +58,8 @@ export async function enqueueSyncOperation(
     }
 
     await db.runAsync(`
-        INSERT INTO sync_queue (
-            id, entity_type, entity_local_id, operation, payload,
-            status, attempts, last_error, created_at, updated_at, owner_email
-        )
+        INSERT INTO sync_queue (id, entity_type, entity_local_id, operation, payload,
+                                status, attempts, last_error, created_at, updated_at, owner_email)
         VALUES (?, ?, ?, ?, ?, 'pending', 0, NULL, ?, ?, ?)
     `, [
         createQueueId(),
@@ -78,39 +76,65 @@ export async function enqueueSyncOperation(
 export async function getPendingSyncQueue(limit = 25): Promise<SyncQueueItem[]> {
     const db = await getDB();
     const ownerEmail = await requireCurrentOwnerEmail();
+    const timestamp = nowIso();
+
+    const staleProcessingBefore = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+    await db.runAsync(`
+          UPDATE sync_queue
+          SET status = 'pending',
+              locked_at = NULL,
+              updated_at = ?
+          WHERE owner_email = ?
+            AND status = 'processing'
+            AND locked_at IS NOT NULL
+            AND locked_at < ?
+      `, [timestamp, ownerEmail, staleProcessingBefore]);
 
     return db.getAllAsync<SyncQueueItem>(`
-        SELECT id, entity_type, entity_local_id, operation, payload, status, attempts, last_error
+        SELECT id,
+               entity_type,
+               entity_local_id,
+               operation,
+               payload,
+               status,
+               attempts,
+               last_error
         FROM sync_queue
         WHERE owner_email = ?
           AND status IN ('pending', 'error')
+          AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
         ORDER BY created_at ASC
         LIMIT ?
-    `, [ownerEmail, limit]);
+    `, [ownerEmail, timestamp, limit]);
 }
 
 export async function markSyncQueueItemProcessing(id: string): Promise<void> {
     const db = await getDB();
+    const timestamp = nowIso();
 
     await db.runAsync(`
         UPDATE sync_queue
-        SET status = 'processing',
-            attempts = attempts + 1,
+        SET status     = 'processing',
+            attempts   = attempts + 1,
+            locked_at  = ?,
             updated_at = ?
         WHERE id = ?
-    `, [nowIso(), id]);
+    `, [timestamp, timestamp, id]);
 }
 
 export async function markSyncQueueItemSynced(id: string): Promise<void> {
     const db = await getDB();
+    const timestamp = nowIso();
 
     await db.runAsync(`
         UPDATE sync_queue
-        SET status = 'synced',
+        SET status     = 'synced',
+            locked_at = NULL,
             last_error = NULL,
             updated_at = ?
         WHERE id = ?
-    `, [nowIso(), id]);
+    `, [timestamp, id]);
 }
 
 export async function markSyncQueueItemError(id: string, error: unknown): Promise<void> {
@@ -119,9 +143,25 @@ export async function markSyncQueueItemError(id: string, error: unknown): Promis
 
     await db.runAsync(`
         UPDATE sync_queue
-        SET status = 'error',
+        SET status     = 'error',
+            locked_at = NULL,
             last_error = ?,
             updated_at = ?
         WHERE id = ?
     `, [message, nowIso(), id]);
+}
+
+export async function markSyncQueueItemFailed(id: string, error: unknown): Promise<void> {
+    const db = await getDB();
+    const message = error instanceof Error ? error.message : String(error);
+    const timestamp = nowIso();
+    
+    await db.runAsync(`
+        UPDATE sync_queue
+        SET status = 'failed',
+            locked_at = NULL,
+            last_error = ?,
+            updated_at = ?
+        WHERE id = ?        
+    `, [message, timestamp, id]);
 }

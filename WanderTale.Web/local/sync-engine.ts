@@ -34,7 +34,7 @@ import {Photo} from "@/types/photo";
 import {CreateTripDto, Trip} from "@/types/trip";
 import {
     getPendingSyncQueue,
-    markSyncQueueItemError,
+    markSyncQueueItemError, markSyncQueueItemFailed,
     markSyncQueueItemProcessing,
     markSyncQueueItemSynced,
     SyncQueueItem,
@@ -225,11 +225,11 @@ async function syncEntryCreate(item: SyncQueueItem): Promise<void> {
         throw new Error(`Trip is not synced yet: ${localEntry.tripLocalId}`);
     }
 
-    const dto: CreateEntryDto = JSON.parse(item.payload);
+    const dto: CreateEntryDto & {clientId?: string | null} = JSON.parse(item.payload);
     const serverEntry = await apiFetch<Entry>(`/trips/${tripServerId}/entries`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(dto),
+        body: JSON.stringify({...dto, clientId: dto.clientId ?? item.entity_local_id}),
     });
 
     const softDeletedAfter = await getSoftDeletedLocalEntryId(item.entity_local_id);
@@ -300,6 +300,9 @@ async function syncPhotoCreate(item: SyncQueueItem): Promise<void> {
     }
 
     const formData = new FormData();
+
+    formData.append("clientId", item.entity_local_id);
+    
     if (localPhoto.photo.caption) formData.append("caption", localPhoto.photo.caption);
     if (localPhoto.photo.photoDate) formData.append("photoDate", localPhoto.photo.photoDate);
     if (localPhoto.photo.location) formData.append("location", localPhoto.photo.location);
@@ -444,7 +447,12 @@ export async function processPendingSyncQueue(): Promise<void> {
 
                 throw new Error(`Unsupported sync operation: ${item.entity_type}/${item.operation}`);
             } catch (error) {
+                if (isPermanentSyncError(error)) {
+                await markSyncQueueItemFailed(item.id, error);
+            } 
+            else {
                 await markSyncQueueItemError(item.id, error);
+            }
                 if (isUnauthorized(error)) {
                     break;
                 }
@@ -452,5 +460,10 @@ export async function processPendingSyncQueue(): Promise<void> {
         }
     } finally {
         isProcessing = false;
+    }
+
+    function isPermanentSyncError(error: unknown): boolean {
+        return error instanceof ApiError &&
+            [400, 403, 404].includes(error.status);
     }
 }

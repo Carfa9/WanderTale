@@ -83,7 +83,7 @@ describe("sync-queue", () => {
         expect(result).toEqual([{id: "sync_1"}]);
         expect(db.getAllAsync).toHaveBeenCalledWith(
             expect.stringContaining("status IN ('pending', 'error')"),
-            ["__anonymous__", 10]
+            ["__anonymous__", "2026-05-21T10:00:00.000Z", 10]
         );
         expect(db.getAllAsync.mock.calls[0][0]).toContain("ORDER BY created_at ASC");
     });
@@ -95,8 +95,8 @@ describe("sync-queue", () => {
         await markSyncQueueItemProcessing("sync_1");
 
         expect(db.runAsync).toHaveBeenCalledWith(
-            expect.stringContaining("attempts = attempts + 1"),
-            ["2026-05-21T10:00:00.000Z", "sync_1"]
+            expect.stringContaining("attempts   = attempts + 1"),
+            ["2026-05-21T10:00:00.000Z", "2026-05-21T10:00:00.000Z", "sync_1"]
         );
     });
 
